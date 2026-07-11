@@ -1,56 +1,56 @@
 const TEACHER_NAME = "Elven Zeng";
-const STORE_KEY = "numbersensePractice.v1";
+const STORE_KEY = "numbersensePractice.caGrade10.v1";
 const TOTAL_DAYS = 10;
-const QUESTIONS_PER_MODULE = 6;
+const QUESTIONS_PER_MODULE = 8;
 
 const modules = [
   {
-    id: "place",
-    name: "位值与大小比较",
-    shortName: "位值大小",
-    goal: "看清每一位数字的价值，快速判断数的大小。"
+    id: "linear",
+    name: "线性关系、斜率与变化率",
+    shortName: "线性斜率",
+    goal: "用斜率、截距、差分和实际费率理解线性变化。"
   },
   {
-    id: "mental",
-    name: "心算加减与补整",
-    shortName: "心算加减",
-    goal: "用凑整、拆分和逆向思考提升计算速度。"
+    id: "equations",
+    name: "一元方程、方程组与建模",
+    shortName: "方程建模",
+    goal: "把文字关系转成方程，快速判断未知量的合理范围。"
   },
   {
-    id: "multiply",
-    name: "乘除、倍数与余数",
-    shortName: "乘除倍数",
-    goal: "建立乘除之间的联系，理解倍数、因数和余数。"
+    id: "polynomials",
+    name: "多项式运算与因式分解",
+    shortName: "多项式",
+    goal: "在展开、合并、提公因式和分解中建立代数结构感。"
   },
   {
-    id: "fraction",
-    name: "分数、小数、百分数",
-    shortName: "分小百",
-    goal: "在三种表示之间转换，形成比例大小感。"
+    id: "exponents",
+    name: "指数、根式与科学记数法",
+    shortName: "指数根式",
+    goal: "熟练处理指数律、平方根估计和数量级。"
   },
   {
-    id: "estimate",
-    name: "估算与合理性检查",
-    shortName: "估算检查",
-    goal: "先判断答案大概在哪，再检查结果是否合理。"
+    id: "quadratics",
+    name: "二次关系、抛物线与差分",
+    shortName: "二次关系",
+    goal: "从顶点、零点、对称轴和二阶差分理解二次函数。"
   },
   {
-    id: "numberline",
-    name: "数轴、正负数与距离",
-    shortName: "数轴正负",
-    goal: "用位置、方向和距离理解正负数。"
+    id: "trig",
+    name: "直角三角、勾股与三角比",
+    shortName: "三角测量",
+    goal: "用长度比、坡度和实际测量理解 sin、cos、tan。"
   },
   {
-    id: "ratio",
-    name: "比例、单位与量感",
-    shortName: "比例单位",
-    goal: "把数量放进真实单位和比例关系里理解。"
+    id: "financial",
+    name: "金融、比例、单位与估算",
+    shortName: "金融比例",
+    goal: "在 CAD、税、折扣、利息和单位率中训练现实数量感。"
   },
   {
-    id: "pattern",
-    name: "规律、平均数与数据感",
-    shortName: "规律数据",
-    goal: "观察变化规律，理解平均、范围和数据中心。"
+    id: "data",
+    name: "数据、概率与误差判断",
+    shortName: "数据概率",
+    goal: "用平均、离散程度、概率和误差判断数据是否合理。"
   }
 ];
 
@@ -591,270 +591,402 @@ function getTeacherQuestions(day, filter) {
 
 function buildQuestion(day, moduleIndex, qNumber) {
   const id = `d${day}-m${moduleIndex + 1}-q${qNumber}`;
-  const base = day * 10 + qNumber;
   let prompt = "";
   let answer = "";
 
-  if (moduleIndex === 0) {
-    const n = 200 + day * 37 + qNumber * 14;
-    const a = 120 + day * 19 + qNumber * 11;
-    const b = 140 + day * 17 + qNumber * 9;
-    if (qNumber === 1) {
-      const tens = Math.floor((n % 100) / 10);
-      prompt = `${n} 中十位上的数字表示多少？`;
-      answer = String(tens * 10);
-    } else if (qNumber === 2) {
-      prompt = `${a} 和 ${b} 比较，填 >、< 或 =。`;
-      answer = a > b ? ">" : a < b ? "<" : "=";
-    } else if (qNumber === 3) {
-      const value = 130 + day * 24 + qNumber * 7;
-      prompt = `把 ${value} 四舍五入到最接近的十位。`;
-      answer = String(Math.round(value / 10) * 10);
-    } else if (qNumber === 4) {
-      const left = 30 + day * 8 + qNumber;
-      const right = left + 2 * ((day % 4) + 2);
-      prompt = `${left} 和 ${right} 正中间的数是几？`;
-      answer = String((left + right) / 2);
-    } else if (qNumber === 5) {
-      const nums = [98 + base * 2, 104 + day * 13 + qNumber, 87 + day * 16 + qNumber * 3];
-      prompt = `把 ${nums.join("、")} 从小到大排列。`;
-      answer = nums.slice().sort((x, y) => x - y).join("、");
-    } else {
-      const value = 300 + day * 41 + qNumber * 18;
-      const h = Math.floor(value / 100) * 100;
-      const t = Math.floor((value % 100) / 10) * 10;
-      const o = value % 10;
-      prompt = `${value} 可以拆成多少 + 多少 + 多少？`;
-      answer = `${h} + ${t} + ${o}`;
-    }
-  }
+  switch (moduleIndex) {
+    case 0: {
+      const slopes = [-3, -2, -1, 2, 3, 4];
+      const m = slopes[(day + qNumber) % slopes.length];
+      const b = day - qNumber;
 
-  if (moduleIndex === 1) {
-    if (qNumber === 1) {
-      const a = 38 + day * 4;
-      const b = 27 + day * 3;
-      prompt = `${a} + ${b} =`;
-      answer = String(a + b);
-    } else if (qNumber === 2) {
-      const a = 120 + day * 9 + qNumber * 5;
-      const b = 46 + day * 3;
-      prompt = `${a} - ${b} =`;
-      answer = String(a - b);
-    } else if (qNumber === 3) {
-      const value = 57 + day * 6;
-      const nextHundred = Math.ceil(value / 100) * 100;
-      prompt = `${value} 还差多少到 ${nextHundred}？`;
-      answer = String(nextHundred - value);
-    } else if (qNumber === 4) {
-      const result = 45 + day * 5;
-      const missing = 18 + day;
-      prompt = `□ - ${missing} = ${result}，□ =`;
-      answer = String(result + missing);
-    } else if (qNumber === 5) {
-      const a = round1(2.4 + day * 0.3);
-      const b = round1(1.7 + qNumber * 0.2);
-      prompt = `${a} + ${b} =`;
-      answer = String(round1(a + b));
-    } else {
-      const a = 75 + day * 7;
-      const b = 28 + qNumber * 3;
-      const c = 12 + day;
-      prompt = `${a} + ${b} - ${c} =`;
-      answer = String(a + b - c);
+      if (qNumber === 1) {
+        const x1 = day - 4;
+        const x2 = x1 + 2;
+        const y1 = m * x1 + b;
+        const y2 = m * x2 + b;
+        prompt = `直线经过 (${x1}, ${y1}) 和 (${x2}, ${y2})，斜率是多少？`;
+        answer = String(m);
+      } else if (qNumber === 2) {
+        const x = day + 3;
+        prompt = `若 y = ${formatLinear(m, b)}，当 x = ${x} 时，y =`;
+        answer = String(m * x + b);
+      } else if (qNumber === 3) {
+        const start = 18 + day;
+        const step = slopes[(day + 2) % slopes.length];
+        prompt = `表格的 y 值是 ${start}、${start + step}、${start + step * 2}、${start + step * 3}，每增加 1 个 x，y 的变化率是`;
+        answer = String(step);
+      } else if (qNumber === 4) {
+        prompt = `线性关系 y = ${formatLinear(m, b)} 的 y-intercept 是多少？`;
+        answer = String(b);
+      } else if (qNumber === 5) {
+        const x = qNumber + day;
+        const target = m * x + b;
+        prompt = `在 y = ${formatLinear(m, b)} 中，如果 y = ${target}，x =`;
+        answer = String(x);
+      } else if (qNumber === 6) {
+        const first = 7 + day;
+        const diff = 3 + (day % 5);
+        prompt = `等差数列第 1 项是 ${first}，公差是 ${diff}，第 10 项是`;
+        answer = String(first + 9 * diff);
+      } else if (qNumber === 7) {
+        const rate = 14 + day;
+        const baseFee = 20 + qNumber;
+        const cost2 = baseFee + rate * 2;
+        const cost5 = baseFee + rate * 5;
+        prompt = `补习收费是线性关系：2 小时 ${formatMoney(cost2)}，5 小时 ${formatMoney(cost5)}。每小时收费是多少？`;
+        answer = formatMoney(rate);
+      } else {
+        const deltaX = 5 + day;
+        prompt = `在线性关系 y = ${formatLinear(m, b)} 中，x 增加 ${deltaX}，y 会变化多少？`;
+        answer = String(m * deltaX);
+      }
+      break;
     }
-  }
 
-  if (moduleIndex === 2) {
-    if (qNumber === 1) {
-      const a = 4 + (day % 6);
-      const b = 6 + qNumber + (day % 3);
-      prompt = `${a} × ${b} =`;
-      answer = String(a * b);
-    } else if (qNumber === 2) {
-      const divisor = 3 + (day % 5);
-      const quotient = 7 + qNumber + day;
-      prompt = `${divisor * quotient} ÷ ${divisor} =`;
-      answer = String(quotient);
-    } else if (qNumber === 3) {
-      const factor = 4 + (day % 4);
-      const missing = 5 + qNumber + (day % 5);
-      prompt = `${factor} × □ = ${factor * missing}，□ =`;
-      answer = String(missing);
-    } else if (qNumber === 4) {
-      const n = 4 + day;
-      prompt = `${n} 的下一个倍数是多少？`;
-      answer = String(n * 2);
-    } else if (qNumber === 5) {
-      const divisor = 5 + (day % 4);
-      const quotient = 6 + day;
-      const remainder = (day + qNumber) % divisor;
-      prompt = `${divisor * quotient + remainder} ÷ ${divisor} 的余数是几？`;
-      answer = String(remainder);
-    } else {
-      const n = 18 + day * 2;
-      const candidate = n + (day % 3 === 0 ? 0 : 1);
-      prompt = `${candidate} 是 ${n} 的因数吗？填 是 或 否。`;
-      answer = n % candidate === 0 ? "是" : "否";
+    case 1: {
+      if (qNumber === 1) {
+        const a = 2 + (day % 5);
+        const x = 4 + day;
+        const b = qNumber - day;
+        prompt = `解方程：${formatLinear(a, b)} = ${a * x + b}，x =`;
+        answer = String(x);
+      } else if (qNumber === 2) {
+        const a = 2 + (day % 4);
+        const shift = (day % 5) - 2;
+        const x = 6 + qNumber;
+        prompt = `解方程：${a}(x${signTerm(shift)}) = ${a * (x + shift)}，x =`;
+        answer = String(x);
+      } else if (qNumber === 3) {
+        const length = 10 + day;
+        const width = 4 + day;
+        const perimeter = 2 * length + 2 * width;
+        prompt = `矩形周长 P = 2l + 2w。若 P = ${perimeter}，l = ${length}，w =`;
+        answer = String(width);
+      } else if (qNumber === 4) {
+        const x = 7 + day;
+        const y = 2 + qNumber;
+        prompt = `方程组 x + y = ${x + y}，x - y = ${x - y}。x =`;
+        answer = String(x);
+      } else if (qNumber === 5) {
+        const x = 3 + day;
+        const y = 2 * day + qNumber;
+        const b1 = y - 2 * x;
+        const b2 = y + x;
+        prompt = `两条直线 y = ${formatLinear(2, b1)} 和 y = ${formatLinear(-1, b2)} 的交点 x 坐标是`;
+        answer = String(x);
+      } else if (qNumber === 6) {
+        const a = 2 + (day % 4);
+        const x = 5 + day;
+        const b = day - 3;
+        prompt = `不等式 ${formatLinear(a, b)} > ${a * x + b - 1} 的最小整数解是`;
+        answer = String(x);
+      } else if (qNumber === 7) {
+        const original = 100 + day * 20;
+        const percent = 10 + day * 5;
+        const finalValue = original * (1 + percent / 100);
+        prompt = `一个数增加 ${percent}% 后变成 ${finalValue}，原数是`;
+        answer = String(original);
+      } else {
+        const first = 72 + day;
+        const second = 84 + day;
+        const third = 90 + day;
+        const average = (first + second + third) / 3;
+        prompt = `三次数学小测 ${first}、${second}、□ 的平均分是 ${formatDecimal(average, 1)}，□ =`;
+        answer = String(third);
+      }
+      break;
     }
-  }
 
-  if (moduleIndex === 3) {
-    if (qNumber === 1) {
-      const n = 30 + day * 4;
-      prompt = `${n} 的 1/2 是多少？`;
-      answer = String(n / 2);
-    } else if (qNumber === 2) {
-      const n = 40 + day * 4;
-      prompt = `${n} 的 1/4 是多少？`;
-      answer = String(n / 4);
-    } else if (qNumber === 3) {
-      const numerator = (day % 4) + 1;
-      prompt = `${numerator}/10 写成小数是几？`;
-      answer = String(round1(numerator / 10));
-    } else if (qNumber === 4) {
-      const numerator = (day % 5) + 1;
-      prompt = `${numerator}/20 写成百分数是多少？`;
-      answer = `${numerator * 5}%`;
-    } else if (qNumber === 5) {
-      const numerator = 2 + (day % 4);
-      const denominator = numerator * 3;
-      prompt = `把 ${numerator}/${denominator} 约分。`;
-      answer = reduceFraction(numerator, denominator);
-    } else {
-      const decimal = round1(0.2 + (day % 6) * 0.1);
-      prompt = `${decimal} 写成百分数是多少？`;
-      answer = `${Math.round(decimal * 100)}%`;
+    case 2: {
+      if (qNumber === 1) {
+        const a = 2 + (day % 5);
+        const c = 3 + qNumber;
+        const b = day - 6;
+        const d = 4 - day;
+        prompt = `合并同类项：(${formatLinear(a, b)}) + (${formatLinear(c, d)}) =`;
+        answer = formatLinear(a + c, b + d);
+      } else if (qNumber === 2) {
+        const a = 2 + (day % 4);
+        const b = 3 + qNumber;
+        const c = day - 5;
+        prompt = `展开：${a}x(${formatLinear(b, c)}) =`;
+        answer = formatPolynomial([
+          { coef: a * b, power: 2 },
+          { coef: a * c, power: 1 }
+        ]);
+      } else if (qNumber === 3) {
+        const r = 2 + (day % 5);
+        const s = qNumber - 5;
+        prompt = `展开：(x${signTerm(r)})(x${signTerm(s)}) =`;
+        answer = formatPolynomial([
+          { coef: 1, power: 2 },
+          { coef: r + s, power: 1 },
+          { coef: r * s, power: 0 }
+        ]);
+      } else if (qNumber === 4) {
+        const a = 3 + (day % 4);
+        const b = 2 + qNumber;
+        prompt = `提公因式：${formatPolynomial([{ coef: a, power: 2 }, { coef: a * b, power: 1 }])} =`;
+        answer = `${a}x(x + ${b})`;
+      } else if (qNumber === 5) {
+        const r = 2 + (day % 4);
+        const s = 3 + (day % 5);
+        prompt = `因式分解：${formatPolynomial([{ coef: 1, power: 2 }, { coef: r + s, power: 1 }, { coef: r * s, power: 0 }])} =`;
+        answer = `${formatFactor(r)}${formatFactor(s)}`;
+      } else if (qNumber === 6) {
+        const r = 2 + (day % 6);
+        prompt = `展开：(x + ${r})^2 =`;
+        answer = formatPolynomial([
+          { coef: 1, power: 2 },
+          { coef: 2 * r, power: 1 },
+          { coef: r * r, power: 0 }
+        ]);
+      } else if (qNumber === 7) {
+        const x = day - 3;
+        const c = 5 - qNumber;
+        prompt = `若 p(x) = ${formatPolynomial([{ coef: 2, power: 2 }, { coef: -3, power: 1 }, { coef: c, power: 0 }])}，p(${x}) =`;
+        answer = String(2 * x * x - 3 * x + c);
+      } else {
+        const degree = 3 + (day % 2);
+        prompt = `多项式 ${formatPolynomial([{ coef: 4, power: degree }, { coef: -2, power: 2 }, { coef: 7, power: 0 }])} 的次数是`;
+        answer = String(degree);
+      }
+      break;
     }
-  }
 
-  if (moduleIndex === 4) {
-    if (qNumber === 1) {
-      const a = 41 + day * 7;
-      const b = 26 + day * 6;
-      prompt = `估算 ${a} + ${b}，把两个数都看成最接近的十位，结果约是几？`;
-      answer = String(Math.round(a / 10) * 10 + Math.round(b / 10) * 10);
-    } else if (qNumber === 2) {
-      const a = 18 + day;
-      const b = 29 + qNumber * 2;
-      prompt = `估算 ${a} × ${b}，把两个数都看成最接近的十位，结果约是几？`;
-      answer = String(Math.round(a / 10) * 10 * Math.round(b / 10) * 10);
-    } else if (qNumber === 3) {
-      const a = 98 + day * 5;
-      const b = 51 + day * 3;
-      prompt = `${a} - ${b} 的结果更接近 40 还是 60？`;
-      answer = Math.abs(a - b - 40) <= Math.abs(a - b - 60) ? "40" : "60";
-    } else if (qNumber === 4) {
-      const exact = 24 + day * 3;
-      const estimate = Math.round(exact / 10) * 10;
-      prompt = `${exact} 四舍五入到十位后是 ${estimate}，估算值比原数大还是小？`;
-      answer = estimate > exact ? "大" : estimate < exact ? "小" : "一样";
-    } else if (qNumber === 5) {
-      const a = 58 + day * 4;
-      const b = 7 + (day % 4);
-      prompt = `${a} × ${b} 大约是几百？`;
-      answer = String(Math.round((a * b) / 100) * 100);
-    } else {
-      const total = 240 + day * 30;
-      const people = 6 + (day % 4);
-      prompt = `${people} 人平均分 ${total} 个物品，每人大约分到几十个？`;
-      answer = `${Math.round((total / people) / 10) * 10}`;
+    case 3: {
+      if (qNumber === 1) {
+        const a = 2 + (day % 5);
+        const b = 3 + (day % 4);
+        prompt = `2^${a} × 2^${b} = 2^□，□ =`;
+        answer = String(a + b);
+      } else if (qNumber === 2) {
+        const a = 5 + day;
+        const b = 3 + qNumber;
+        const c = 2 + (day % 3);
+        prompt = `(x^${a} × x^${b}) ÷ x^${c} = x^□，□ =`;
+        answer = String(a + b - c);
+      } else if (qNumber === 3) {
+        const n = 9 + day;
+        prompt = `√${n * n} =`;
+        answer = String(n);
+      } else if (qNumber === 4) {
+        const outside = 2 + (day % 4);
+        const inside = [2, 3, 5, 6][day % 4];
+        prompt = `化简根式：√${outside * outside * inside} =`;
+        answer = `${outside}√${inside}`;
+      } else if (qNumber === 5) {
+        const coefficient = 2 + (day % 3);
+        const multiplier = 2;
+        const power = 4 + (day % 3);
+        prompt = `(${coefficient} × 10^${power}) × (${multiplier} × 10^2) =`;
+        answer = `${coefficient * multiplier} × 10^${power + 2}`;
+      } else if (qNumber === 6) {
+        const base = 2 + (day % 4);
+        const exponent = 2 + (day % 2);
+        prompt = `${base}^-${exponent} =`;
+        answer = `1/${base ** exponent}`;
+      } else if (qNumber === 7) {
+        const coefficient = 3 + (day % 6);
+        const power = 4 + (qNumber % 3);
+        const value = coefficient * 10 ** power;
+        prompt = `把 ${value} 写成科学记数法。`;
+        answer = `${coefficient} × 10^${power}`;
+      } else {
+        const lower = 8 + day;
+        const n = lower * lower + 2 * day + 3;
+        prompt = `√${n} 介于哪两个连续整数之间？`;
+        answer = `${lower} 和 ${lower + 1}`;
+      }
+      break;
     }
-  }
 
-  if (moduleIndex === 5) {
-    if (qNumber === 1) {
-      const start = -8 + day;
-      const change = 5 + (day % 4);
-      prompt = `气温从 ${start}℃ 上升 ${change}℃，现在是几℃？`;
-      answer = `${start + change}`;
-    } else if (qNumber === 2) {
-      const a = -12 + day;
-      const b = 4 + qNumber;
-      prompt = `数轴上 ${a} 到 ${b} 的距离是多少？`;
-      answer = String(Math.abs(b - a));
-    } else if (qNumber === 3) {
-      const left = -10 + day;
-      const right = left + 2 * (4 + (day % 3));
-      prompt = `${left} 和 ${right} 的中点是多少？`;
-      answer = String((left + right) / 2);
-    } else if (qNumber === 4) {
-      const a = -(3 + day);
-      const b = -(6 + qNumber);
-      prompt = `${a} 和 ${b} 哪个更大？`;
-      answer = String(Math.max(a, b));
-    } else if (qNumber === 5) {
-      const balance = -20 - day * 3;
-      const deposit = 35 + qNumber * 2;
-      prompt = `账户余额 ${balance} 元，存入 ${deposit} 元后余额是多少？`;
-      answer = String(balance + deposit);
-    } else {
-      const value = -5 - day;
-      prompt = `${value} 的相反数是多少？`;
-      answer = String(-value);
+    case 4: {
+      if (qNumber === 1) {
+        const a = 1 + (day % 3);
+        const b = qNumber - day;
+        const c = 4 - day;
+        const x = day - 2;
+        prompt = `若 f(x) = ${formatPolynomial([{ coef: a, power: 2 }, { coef: b, power: 1 }, { coef: c, power: 0 }])}，f(${x}) =`;
+        answer = String(a * x * x + b * x + c);
+      } else if (qNumber === 2) {
+        const h = day - 5;
+        const k = qNumber - 6;
+        prompt = `二次函数 y = (x${signTerm(-h)})^2${signTerm(k)} 的顶点是`;
+        answer = `(${h}, ${k})`;
+      } else if (qNumber === 3) {
+        const r1 = -2 - (day % 4);
+        const r2 = 3 + (day % 5);
+        prompt = `二次函数 y = ${formatFactor(-r1)}${formatFactor(-r2)} 的零点是`;
+        answer = `${r1}, ${r2}`;
+      } else if (qNumber === 4) {
+        const r1 = 2 + (day % 3);
+        const r2 = r1 + 4;
+        prompt = `抛物线的两个零点是 x = ${r1} 和 x = ${r2}，对称轴是 x =`;
+        answer = String((r1 + r2) / 2);
+      } else if (qNumber === 5) {
+        const r1 = 2 + (day % 4);
+        const r2 = 5 + (day % 3);
+        const a = 1 + (qNumber % 2);
+        prompt = `y = ${a}${formatFactor(-r1)}${formatFactor(-r2)} 的 y-intercept 是`;
+        answer = String(a * r1 * r2);
+      } else if (qNumber === 6) {
+        const r = 2 + (day % 5);
+        const s = 1 + qNumber;
+        prompt = `展开：(x - ${r})(x + ${s}) =`;
+        answer = formatPolynomial([
+          { coef: 1, power: 2 },
+          { coef: s - r, power: 1 },
+          { coef: -r * s, power: 0 }
+        ]);
+      } else if (qNumber === 7) {
+        const half = 3 + (day % 5);
+        const b = 2 * half;
+        prompt = `要让 x^2 + ${b}x + c 成为完全平方三项式，c =`;
+        answer = String(half * half);
+      } else {
+        const a = 1 + (day % 4);
+        const b = qNumber - 5;
+        const c = 2 - day;
+        const y0 = c;
+        const y1 = a + b + c;
+        const y2 = 4 * a + 2 * b + c;
+        prompt = `二次关系在 x = 0, 1, 2 时的 y 值是 ${y0}、${y1}、${y2}，二阶差分是`;
+        answer = String(y2 - 2 * y1 + y0);
+      }
+      break;
     }
-  }
 
-  if (moduleIndex === 6) {
-    if (qNumber === 1) {
-      const cm = 120 + day * 10;
-      prompt = `${cm} 厘米 = 多少米？`;
-      answer = String(round2(cm / 100));
-    } else if (qNumber === 2) {
-      const kg = round1(1.2 + day * 0.2);
-      prompt = `${kg} 千克 = 多少克？`;
-      answer = String(Math.round(kg * 1000));
-    } else if (qNumber === 3) {
-      const price = 3 + (day % 5);
-      const count = 4 + qNumber;
-      prompt = `每个 ${price} 元，买 ${count} 个一共多少元？`;
-      answer = String(price * count);
-    } else if (qNumber === 4) {
-      const one = 2 + (day % 4);
-      const many = 5 + qNumber;
-      prompt = `${one} 本练习册需要 ${one * 3} 分钟，照这样 ${many} 本需要多少分钟？`;
-      answer = String(many * 3);
-    } else if (qNumber === 5) {
-      const total = 7 * (5 + day);
-      prompt = `红球和蓝球的数量比是 3:4，一共有 ${total} 个，其中红球有多少个？`;
-      answer = String((total / 7) * 3);
-    } else {
-      const speed = 4 + (day % 4);
-      const time = 3 + qNumber;
-      prompt = `每小时走 ${speed} 千米，${time} 小时走多少千米？`;
-      answer = String(speed * time);
+    case 5: {
+      const triples = [
+        [3, 4, 5],
+        [5, 12, 13],
+        [8, 15, 17],
+        [7, 24, 25],
+        [9, 12, 15],
+        [6, 8, 10],
+        [10, 24, 26],
+        [12, 16, 20],
+        [15, 20, 25],
+        [20, 21, 29]
+      ];
+      const [legA, legB, hyp] = triples[(day + qNumber) % triples.length];
+
+      if (qNumber === 1) {
+        prompt = `直角三角形两条直角边是 ${legA} 和 ${legB}，斜边是`;
+        answer = String(hyp);
+      } else if (qNumber === 2) {
+        prompt = `直角三角形斜边是 ${hyp}，一条直角边是 ${legA}，另一条直角边是`;
+        answer = String(legB);
+      } else if (qNumber === 3) {
+        prompt = `直角三角形中，相对边 ${legA}，斜边 ${hyp}，sin θ =`;
+        answer = reduceFraction(legA, hyp);
+      } else if (qNumber === 4) {
+        prompt = `直角三角形中，邻边 ${legB}，斜边 ${hyp}，cos θ 约等于多少？保留两位小数。`;
+        answer = formatDecimal(legB / hyp, 2);
+      } else if (qNumber === 5) {
+        prompt = `直角三角形中，相对边 ${legA}，邻边 ${legB}，tan θ =`;
+        answer = reduceFraction(legA, legB);
+      } else if (qNumber === 6) {
+        prompt = `一架梯子长 ${hyp} m，梯脚离墙 ${legA} m，梯子到墙上的高度是几 m？`;
+        answer = String(legB);
+      } else if (qNumber === 7) {
+        prompt = `一条坡道 rise = ${legA}，run = ${legB}，坡度 tan θ =`;
+        answer = reduceFraction(legA, legB);
+      } else {
+        prompt = `直角三角形两条直角边是 ${legA} cm 和 ${legB} cm，面积是几 cm²？`;
+        answer = String((legA * legB) / 2);
+      }
+      break;
     }
-  }
 
-  if (moduleIndex === 7) {
-    if (qNumber === 1) {
-      const start = 3 + day;
-      const step = 2 + (day % 4);
-      prompt = `${start}、${start + step}、${start + step * 2}、${start + step * 3}，下一个数是几？`;
-      answer = String(start + step * 4);
-    } else if (qNumber === 2) {
-      const start = 2 + (day % 3);
-      prompt = `${start}、${start * 2}、${start * 4}、${start * 8}，下一个数是几？`;
-      answer = String(start * 16);
-    } else if (qNumber === 3) {
-      const a = 60 + day * 2;
-      const b = 70 + day;
-      const c = 80 + day * 3;
-      prompt = `${a}、${b}、${c} 的平均数是多少？`;
-      answer = String((a + b + c) / 3);
-    } else if (qNumber === 4) {
-      const target = 75 + day;
-      const a = target - 5;
-      const b = target + 3;
-      prompt = `${a}、${b}、□ 的平均数是 ${target}，□ =`;
-      answer = String(target * 3 - a - b);
-    } else if (qNumber === 5) {
-      const nums = [12 + day, 8 + qNumber, 17 + day, 10 + day * 2, 14 + qNumber];
-      prompt = `${nums.join("、")} 的中位数是多少？`;
-      answer = String(nums.slice().sort((x, y) => x - y)[2]);
-    } else {
-      const nums = [22 + day, 35 + qNumber, 28 + day * 2, 19 + qNumber];
-      prompt = `${nums.join("、")} 的极差是多少？`;
-      answer = String(Math.max(...nums) - Math.min(...nums));
+    case 6: {
+      if (qNumber === 1) {
+        const price = 80 + day * 10;
+        const discount = 10 + (day % 4) * 5;
+        prompt = `加拿大商店一件外套 ${formatMoney(price)}，打 ${discount}% off。税前价格是`;
+        answer = formatMoney(price * (1 - discount / 100));
+      } else if (qNumber === 2) {
+        const price = 100 + day * 10;
+        prompt = `商品税前 ${formatMoney(price)}，按 13% HST 计算，税后总价是`;
+        answer = formatMoney(price * 1.13);
+      } else if (qNumber === 3) {
+        const meal = 40 + day * 5;
+        prompt = `餐费 ${formatMoney(meal)}，给 15% tip，总共支付`;
+        answer = formatMoney(meal * 1.15);
+      } else if (qNumber === 4) {
+        const principal = 500 + day * 100;
+        const rate = 3 + (day % 5);
+        const years = 2 + (day % 3);
+        prompt = `本金 ${formatMoney(principal)}，单利 ${rate}%/year，${years} 年的利息是`;
+        answer = formatMoney(principal * (rate / 100) * years);
+      } else if (qNumber === 5) {
+        const cad = 100 + day * 50;
+        const rate = 0.74;
+        prompt = `若 1 CAD ≈ 0.74 USD，${formatMoney(cad)} CAD 约等于多少 USD？`;
+        answer = `${formatMoney(cad * rate)} USD`;
+      } else if (qNumber === 6) {
+        const speed = 72 + day * 3;
+        const time = 1.5 + (day % 3) * 0.5;
+        prompt = `汽车平均速度 ${speed} km/h，行驶 ${time} h，距离是几 km？`;
+        answer = formatDecimal(speed * time, 1);
+      } else if (qNumber === 7) {
+        const count = 4 + (day % 4);
+        const unit = 3 + day;
+        prompt = `${count} 个同款笔记本共 ${formatMoney(count * unit)}，单价是`;
+        answer = formatMoney(unit);
+      } else {
+        const original = 80 + day * 10;
+        const percent = 10 + (day % 5) * 5;
+        const newer = original * (1 + percent / 100);
+        prompt = `数量从 ${original} 增加到 ${formatDecimal(newer, 1)}，percent increase 是多少？`;
+        answer = `${percent}%`;
+      }
+      break;
+    }
+
+    case 7: {
+      if (qNumber === 1) {
+        const nums = [60 + day, 70 + day, 80 + day];
+        prompt = `${nums.join("、")} 的平均数是`;
+        answer = String(70 + day);
+      } else if (qNumber === 2) {
+        const nums = [82 + day, 70 + day, 90 + day, 76 + day, 84 + day];
+        prompt = `${nums.join("、")} 的中位数是`;
+        answer = String(nums.slice().sort((a, b) => a - b)[2]);
+      } else if (qNumber === 3) {
+        const nums = [45 + day, 62 + day, 58 + day, 71 + day, 49 + day];
+        prompt = `${nums.join("、")} 的 range 是`;
+        answer = String(Math.max(...nums) - Math.min(...nums));
+      } else if (qNumber === 4) {
+        const test = 70 + day;
+        const project = 80 + day;
+        prompt = `成绩由 test 40% 和 project 60% 组成。test=${test}，project=${project}，总评是`;
+        answer = formatDecimal(test * 0.4 + project * 0.6, 1);
+      } else if (qNumber === 5) {
+        const red = 3 + day;
+        const blue = 5 + qNumber;
+        prompt = `袋中有 ${red} 个红球和 ${blue} 个蓝球，随机取 1 个是红球的概率是`;
+        answer = reduceFraction(red, red + blue);
+      } else if (qNumber === 6) {
+        const actual = 100 + day * 10;
+        const percentError = 5 + (day % 4) * 5;
+        const estimate = actual * (1 + percentError / 100);
+        prompt = `实际值 ${actual}，估计值 ${formatDecimal(estimate, 1)}，percent error 是`;
+        answer = `${percentError}%`;
+      } else if (qNumber === 7) {
+        const q1 = 18 + day;
+        const q3 = 34 + day + qNumber;
+        prompt = `一组数据的 Q1 = ${q1}，Q3 = ${q3}，IQR =`;
+        answer = String(q3 - q1);
+      } else {
+        const start = 1200 + day * 80;
+        const yearly = 150 + day * 10;
+        prompt = `某社区人口从 ${start} 开始，每年线性增加 ${yearly}。4 年后人口是`;
+        answer = String(start + 4 * yearly);
+      }
+      break;
     }
   }
 
@@ -866,6 +998,56 @@ function buildQuestion(day, moduleIndex, qNumber) {
     prompt,
     answer
   };
+}
+
+function signTerm(value, variable = "") {
+  if (value === 0) return "";
+  const sign = value < 0 ? " - " : " + ";
+  const abs = Math.abs(value);
+  const body = variable ? `${abs === 1 ? "" : abs}${variable}` : String(abs);
+  return `${sign}${body}`;
+}
+
+function formatLinear(coef, constant) {
+  return formatPolynomial([
+    { coef, power: 1 },
+    { coef: constant, power: 0 }
+  ]);
+}
+
+function formatPolynomial(terms) {
+  const cleanTerms = terms.filter((term) => term.coef !== 0);
+  if (!cleanTerms.length) return "0";
+
+  return cleanTerms
+    .map((term, index) => {
+      const sign = term.coef < 0 ? (index === 0 ? "-" : " - ") : index === 0 ? "" : " + ";
+      const abs = Math.abs(term.coef);
+      let body = "";
+
+      if (term.power === 0) {
+        body = String(abs);
+      } else if (term.power === 1) {
+        body = `${abs === 1 ? "" : abs}x`;
+      } else {
+        body = `${abs === 1 ? "" : abs}x^${term.power}`;
+      }
+
+      return `${sign}${body}`;
+    })
+    .join("");
+}
+
+function formatFactor(constant) {
+  return `(x${signTerm(constant)})`;
+}
+
+function formatMoney(value) {
+  return `$${Number(value).toFixed(2)}`;
+}
+
+function formatDecimal(value, places = 1) {
+  return Number(value.toFixed(places)).toString();
 }
 
 function getRecord(qid) {
@@ -997,7 +1179,7 @@ function getAchievements() {
   const overall = getOverallStats();
   const dayStats = Array.from({ length: TOTAL_DAYS }, (_, index) => getDayStats(index + 1));
   const fullDays = dayStats.filter((stats) => stats.answered === stats.total).length;
-  const highDays = dayStats.filter((stats) => stats.graded >= 24 && stats.correct >= 20).length;
+  const highDays = dayStats.filter((stats) => stats.graded >= 32 && stats.correct >= 28).length;
   const completedModules = countCompletedModules();
   const points =
     overall.answered +
@@ -1022,7 +1204,7 @@ function getAchievements() {
     },
     {
       name: "一日通关",
-      desc: "完成任意一天 48 道题。",
+      desc: "完成任意一天 64 道题。",
       unlocked: fullDays >= 1
     },
     {
@@ -1037,7 +1219,7 @@ function getAchievements() {
     },
     {
       name: "稳定发挥",
-      desc: "至少 3 天获得 20 道以上正确批改。",
+      desc: "至少 3 天获得 28 道以上正确批改。",
       unlocked: highDays >= 3
     }
   ];

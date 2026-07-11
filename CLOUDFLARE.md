@@ -1,6 +1,6 @@
 # Cloudflare Pages 部署
 
-这个项目是纯静态网页，适合部署到 Cloudflare Pages。
+这个项目是加拿大 Grade 10 数感训练的纯静态网页，适合部署到 Cloudflare Pages。
 
 ## 方式一：连接 GitHub 仓库
 
