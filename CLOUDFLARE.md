@@ -1,6 +1,6 @@
 # Cloudflare 部署
 
-这个项目是加拿大 Grade 10 数感训练的纯静态网页。你现在创建的是 Cloudflare Workers 项目 `numbersensepractice2`，优先按 Workers 部署。
+这个项目是 Number Sense Practice 的纯静态网页，核心文件是 `index.html`、`style.css`、`script.js`。你现在创建的是 Cloudflare Workers 项目 `numbersensepractice2`，优先按 Workers 部署。
 
 ## 推荐方式：Cloudflare Workers
 
@@ -58,8 +58,8 @@ npm run cloudflare:preview
 - 如果 URL 里有 `/workers/services/view/numbersensepractice2`，按上面的 Workers 设置。
 - 如果 URL 里是 Pages 项目，按备用的 Pages 设置。
 
-这个项目不再使用 `_redirects` 的 `/* /index.html 200` 规则，因为 Workers 会在静态文件存在时也执行 `_redirects`，会导致 `app.js` 和 `styles.css` 被重写成 HTML。SPA fallback 已经由 `wrangler.jsonc` 的 `assets.not_found_handling` 处理。
+这个项目不再使用 `_redirects` 的 `/* /index.html 200` 规则，因为 Workers 会在静态文件存在时也执行 `_redirects`，会导致 `script.js` 和 `style.css` 被重写成 HTML。SPA fallback 已经由 `wrangler.jsonc` 的 `assets.not_found_handling` 处理。
 
 ## 数据提醒
 
-学生答案仍然保存在浏览器本地存储中。换设备或换浏览器后，需要使用教师端的“导出记录 / 导入记录”同步。
+学生答案仍然保存在浏览器本地存储中。教师面板只能看到同一个浏览器中的学生记录。

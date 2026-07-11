@@ -3,7 +3,7 @@ import { copyFile, mkdir, rm } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const dist = new URL("../dist/", import.meta.url);
 const publicDir = new URL("../public/", import.meta.url);
-const appFiles = ["index.html", "styles.css", "app.js"];
+const appFiles = ["index.html", "style.css", "script.js"];
 const cloudflareFiles = ["_headers"];
 
 for (const outputDir of [dist, publicDir]) {
