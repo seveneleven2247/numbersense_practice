@@ -256,6 +256,19 @@ html.dark .score-card {
   transition: border var(--ease), box-shadow var(--ease), transform var(--ease);
 }
 
+.field select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-repeat: no-repeat;
+  background-size: 6px 6px;
+  padding-right: 36px;
+}
+
 .field textarea {
   min-height: 108px;
   resize: vertical;
@@ -426,6 +439,35 @@ html.dark .score-card {
   font-weight: 800;
 }
 
+.status-pill {
+  color: var(--text);
+}
+
+.status-submitted,
+.status-reviewed,
+.status-complete {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.status-late,
+.status-needs-revision {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+html.dark .status-late,
+html.dark .status-needs-revision {
+  background: #3a2613;
+  color: #fdba74;
+}
+
+.status-missing,
+.status-not-submitted {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .question-shell {
   display: grid;
   gap: 16px;
@@ -550,14 +592,20 @@ html.dark .score-card {
 
 .calendar-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
-  gap: 16px;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
+  gap: 20px;
   align-items: start;
 }
 
 .calendar-panel,
 .date-panel {
   padding: 20px;
+}
+
+.date-panel {
+  display: grid;
+  gap: 16px;
+  overflow: hidden;
 }
 
 .calendar-toolbar {
@@ -577,7 +625,7 @@ html.dark .score-card {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .calendar-weekday {
@@ -592,9 +640,9 @@ html.dark .score-card {
 .calendar-cell {
   display: grid;
   align-content: start;
-  gap: 4px;
-  min-height: 82px;
-  padding: 10px;
+  gap: 6px;
+  min-height: 74px;
+  padding: 9px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -616,8 +664,34 @@ html.dark .score-card {
 .calendar-cell small {
   min-height: 14px;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   line-height: 1.2;
+}
+
+.calendar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.calendar-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.note-tag {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.homework-tag {
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .calendar-cell.today {
@@ -649,6 +723,23 @@ html.dark .score-card {
   background: var(--surface-strong);
 }
 
+.resource-section .assignment-form {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.feedback-form {
+  grid-template-columns: minmax(140px, 0.28fr) minmax(0, 1fr) max-content;
+  align-items: end;
+  margin-bottom: 0;
+}
+
+.feedback-form textarea {
+  min-height: 82px;
+}
+
 .resource-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -660,7 +751,7 @@ html.dark .score-card {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--surface-strong);
 }
 
 .resource-section h3 {
@@ -674,13 +765,29 @@ html.dark .score-card {
 }
 
 .assignment-card,
-.submission-card,
-.resource-strip {
+.submission-card {
   display: grid;
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.resource-strip {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.assignment-card {
+  background: linear-gradient(180deg, var(--surface), var(--surface-strong));
+}
+
+.submission-card {
   background: var(--surface);
 }
 
@@ -691,6 +798,12 @@ html.dark .score-card {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.assignment-head > div,
+.submission-head > div,
+.file-row > div {
+  min-width: 0;
 }
 
 .assignment-head h3,
@@ -735,6 +848,10 @@ html.dark .score-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface-strong);
+}
+
+.file-row .ghost-button {
+  flex: 0 0 auto;
 }
 
 .file-row strong {
@@ -906,6 +1023,15 @@ th {
   .calendar-cell span,
   .calendar-cell small {
     font-size: 0.66rem;
+  }
+
+  .calendar-tag {
+    padding: 2px 5px;
+    font-size: 0.62rem;
+  }
+
+  .feedback-form {
+    grid-template-columns: 1fr;
   }
 
   .assignment-head,

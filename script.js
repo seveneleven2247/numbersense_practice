@@ -1108,7 +1108,7 @@ function teacherHomeworkCard(assignment, assignmentData) {
       </div>
       ${renderFileList(assignment.files)}
       <div class="submission-list">
-        <h4>Student status and private 1:1 comments</h4>
+        <h4>Student Review</h4>
         ${students.length ? students.map((student) => teacherStudentReviewCard(assignment, student.username, assignmentData)).join("") : `<div class="empty">No student accounts yet.</div>`}
       </div>
     </article>
@@ -1127,7 +1127,7 @@ function teacherStudentReviewCard(assignment, student, assignmentData) {
           <strong>${escapeHtml(student)}</strong>
           <span>${submission ? `Submitted ${formatDateTime(submission.submittedAt)}` : "No submission yet"}</span>
         </div>
-        <span class="pill">${escapeHtml(status)}</span>
+        <span class="pill status-pill ${statusClass(status)}">${escapeHtml(status)}</span>
       </div>
       ${submission?.note ? `<p>${escapeHtml(submission.note)}</p>` : ""}
       ${submission ? renderFileList(submission.files) : `<div class="file-list empty">No submitted files.</div>`}
@@ -1155,6 +1155,10 @@ function statusOptions(selectedStatus) {
   return HOMEWORK_STATUSES
     .map((status) => `<option value="${status}" ${status === selectedStatus ? "selected" : ""}>${status}</option>`)
     .join("");
+}
+
+function statusClass(status) {
+  return `status-${status.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 }
 
 function studentNoteCard(note) {
@@ -1196,7 +1200,7 @@ function studentAssignmentCard(assignment, assignmentData) {
     <article class="assignment-card">
       <div class="assignment-head">
         <div>
-          <span class="pill">${escapeHtml(status)}</span>
+          <span class="pill status-pill ${statusClass(status)}">${escapeHtml(status)}</span>
           <h3>${escapeHtml(assignment.title)}</h3>
           <p>${escapeHtml(assignment.instructions)}</p>
         </div>
@@ -1348,12 +1352,15 @@ function calendarCells(monthDate, assignmentData) {
     const selected = selectedCalendarDate === dateKey ? "selected" : "";
     const today = toDateKey(new Date()) === dateKey ? "today" : "";
 
+    const noteBadge = notes.length ? `<span class="calendar-tag note-tag">${notes.length}N</span>` : "";
+    const homeworkBadge = homework.length ? `<span class="calendar-tag homework-tag">${homework.length}H</span>` : "";
+    const submissionBadge = submissions.length ? `<small>${submissions.length} submitted</small>` : "";
+
     cells.push(`
-      <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}">
+      <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}" aria-label="${dateKey}: ${notes.length} notes, ${homework.length} homework, ${submissions.length} submissions">
         <strong>${day}</strong>
-        <span>${notes.length ? `${notes.length} notes` : ""}</span>
-        <span>${homework.length ? `${homework.length} homework` : ""}</span>
-        <small>${submissions.length ? `${submissions.length} submitted` : ""}</small>
+        <span class="calendar-badges">${noteBadge}${homeworkBadge}</span>
+        ${submissionBadge}
       </button>
     `);
   }
