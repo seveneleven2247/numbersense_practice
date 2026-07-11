@@ -59,6 +59,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -242,6 +243,7 @@ html.dark .score-card {
 }
 
 .field input,
+.field select,
 .field textarea,
 .answer-input {
   width: 100%;
@@ -265,6 +267,7 @@ html.dark .score-card {
 }
 
 .field input:focus,
+.field select:focus,
 .field textarea:focus,
 .answer-input:focus {
   border-color: var(--accent);
@@ -646,6 +649,24 @@ html.dark .score-card {
   background: var(--surface-strong);
 }
 
+.resource-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.resource-section {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.resource-section h3 {
+  margin: 0 0 12px;
+}
+
 .assignment-stack {
   display: grid;
   gap: 14px;
@@ -697,6 +718,10 @@ html.dark .score-card {
 .submission-list {
   display: grid;
   gap: 10px;
+}
+
+.student-category {
+  margin-top: 16px;
 }
 
 .file-list {
@@ -826,7 +851,8 @@ th {
 @media (max-width: 940px) {
   .hero,
   .teacher-grid,
-  .calendar-layout {
+  .calendar-layout,
+  .resource-columns {
     grid-template-columns: 1fr;
   }
 

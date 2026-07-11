@@ -7,6 +7,15 @@ const SESSION_KEY = "numberSensePractice.currentUser.v1";
 const THEME_KEY = "numberSensePractice.theme.v1";
 const FILE_DB_NAME = "numberSensePractice.files.v1";
 const FILE_STORE_NAME = "files";
+const HOMEWORK_STATUSES = [
+  "Not submitted",
+  "Submitted",
+  "Late",
+  "Needs revision",
+  "Reviewed",
+  "Complete",
+  "Missing"
+];
 
 const categories = [
   {
@@ -612,8 +621,8 @@ function handleSubmit(event) {
     saveSubmission(form);
   }
 
-  if (form.dataset.form === "feedback") {
-    saveFeedback(form);
+  if (form.dataset.form === "review") {
+    saveReview(form);
   }
 }
 
@@ -932,9 +941,11 @@ function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
   stopTimer();
   selectedCalendarDate = dateKey || toDateKey(new Date());
   const assignmentData = getAssignmentData();
-  const selectedDateAssignments = assignmentData.assignments
+  const selectedDateResources = assignmentData.assignments
     .filter((assignment) => assignment.date === selectedCalendarDate)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const selectedNotes = selectedDateResources.filter((assignment) => getResourceType(assignment) === "note");
+  const selectedHomework = selectedDateResources.filter((assignment) => getResourceType(assignment) === "homework");
   const isTeacher = currentUser.role === "teacher";
 
   app.innerHTML = `
@@ -942,7 +953,7 @@ function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
       <div class="section-head">
         <div>
           <h1>Calendar</h1>
-          <p>${isTeacher ? "Upload lessons, publish homework, and review student submissions." : "Find homework by date and submit your files."}</p>
+          <p>${isTeacher ? "Upload notes, publish homework, and review private student submissions." : "Download notes, download homework, and upload homework by date."}</p>
         </div>
         <div class="button-row">
           ${isTeacher ? `<button class="secondary-button" type="button" data-action="teacher">Teacher Dashboard</button>` : ""}
@@ -967,68 +978,129 @@ function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
           <div class="section-head compact-head">
             <div>
               <h2>${formatDateForDisplay(selectedCalendarDate)}</h2>
-              <p>${selectedDateAssignments.length} assignment${selectedDateAssignments.length === 1 ? "" : "s"} on this date</p>
+              <p>${selectedNotes.length} note${selectedNotes.length === 1 ? "" : "s"} · ${selectedHomework.length} homework item${selectedHomework.length === 1 ? "" : "s"}</p>
             </div>
           </div>
           ${message ? `<div class="message ${calendarMessageClass(message)}">${escapeHtml(message)}</div>` : ""}
-          ${isTeacher ? teacherCalendarTools(selectedDateAssignments, assignmentData) : studentCalendarTools(selectedDateAssignments, assignmentData)}
+          ${isTeacher ? teacherCalendarTools(selectedDateResources, assignmentData) : studentCalendarTools(selectedDateResources, assignmentData)}
         </section>
       </div>
     </section>
   `;
 }
 
-function teacherCalendarTools(assignmentsForDate, assignmentData) {
-  return `
-    <form class="form assignment-form" data-form="assignment">
-      <input type="hidden" name="assignmentDate" value="${selectedCalendarDate}">
-      <div class="field">
-        <label for="assignmentTitle">Homework title</label>
-        <input id="assignmentTitle" name="assignmentTitle" placeholder="Example: Estimation practice set" required>
-      </div>
-      <div class="field">
-        <label for="assignmentInstructions">Instructions</label>
-        <textarea id="assignmentInstructions" name="assignmentInstructions" placeholder="Write the homework instructions or lesson notes." required></textarea>
-      </div>
-      <div class="field">
-        <label for="assignmentFiles">Lesson files or homework files</label>
-        <input id="assignmentFiles" name="assignmentFiles" type="file" multiple>
-      </div>
-      <button class="primary-button" type="submit">Upload to This Date</button>
-    </form>
+function teacherCalendarTools(resourcesForDate, assignmentData) {
+  const notes = resourcesForDate.filter((assignment) => getResourceType(assignment) === "note");
+  const homework = resourcesForDate.filter((assignment) => getResourceType(assignment) === "homework");
 
-    <div class="assignment-stack">
-      ${assignmentsForDate.length ? assignmentsForDate.map((assignment) => teacherAssignmentCard(assignment, assignmentData)).join("") : `<div class="empty">No homework uploaded for this date yet.</div>`}
+  return `
+    <div class="resource-columns">
+      <section class="resource-section">
+        <h3>Upload Notes</h3>
+        ${resourceUploadForm("note")}
+      </section>
+      <section class="resource-section">
+        <h3>Upload Homework</h3>
+        ${resourceUploadForm("homework")}
+      </section>
+    </div>
+
+    <div class="resource-columns">
+      <section class="resource-strip">
+        <h3>Notes for This Date</h3>
+        <div class="assignment-stack">
+          ${notes.length ? notes.map((note) => teacherNoteCard(note)).join("") : `<div class="empty">No notes uploaded for this date.</div>`}
+        </div>
+      </section>
+      <section class="resource-strip">
+        <h3>Homework for This Date</h3>
+        <div class="assignment-stack">
+          ${homework.length ? homework.map((assignment) => teacherHomeworkCard(assignment, assignmentData)).join("") : `<div class="empty">No homework uploaded for this date.</div>`}
+        </div>
+      </section>
     </div>
 
     <section class="resource-strip">
-      <h3>My Uploaded Courseware</h3>
+      <h3>My Uploaded Resources</h3>
       ${teacherCoursewareList(assignmentData)}
     </section>
   `;
 }
 
-function studentCalendarTools(assignmentsForDate, assignmentData) {
-  if (!assignmentsForDate.length) {
-    return `<div class="empty">No homework for this date.</div>`;
-  }
+function resourceUploadForm(kind) {
+  const isNote = kind === "note";
+  const title = isNote ? "Note title" : "Homework title";
+  const instructions = isNote ? "Note description" : "Homework instructions";
+  const fileLabel = isNote ? "Upload note files" : "Upload homework files";
+  const placeholder = isNote ? "Example: Linear relationships notes" : "Example: Estimation practice set";
 
   return `
-    <div class="assignment-stack">
-      ${assignmentsForDate.map((assignment) => studentAssignmentCard(assignment, assignmentData)).join("")}
-    </div>
+    <form class="form assignment-form" data-form="assignment">
+      <input type="hidden" name="assignmentDate" value="${selectedCalendarDate}">
+      <input type="hidden" name="assignmentKind" value="${kind}">
+      <div class="field">
+        <label>${title}</label>
+        <input name="assignmentTitle" placeholder="${placeholder}" required>
+      </div>
+      <div class="field">
+        <label>${instructions}</label>
+        <textarea name="assignmentInstructions" placeholder="${isNote ? "Write a short description for this note." : "Write the homework instructions."}" required></textarea>
+      </div>
+      <div class="field">
+        <label>${fileLabel}</label>
+        <input name="assignmentFiles" type="file" multiple>
+      </div>
+      <button class="${isNote ? "secondary-button" : "primary-button"}" type="submit">${isNote ? "Upload Notes" : "Upload Homework"}</button>
+    </form>
   `;
 }
 
-function teacherAssignmentCard(assignment, assignmentData) {
-  const submissions = assignmentData.submissions
-    .filter((submission) => submission.assignmentId === assignment.id)
-    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+function studentCalendarTools(resourcesForDate, assignmentData) {
+  const notes = resourcesForDate.filter((assignment) => getResourceType(assignment) === "note");
+  const homework = resourcesForDate.filter((assignment) => getResourceType(assignment) === "homework");
+
+  return `
+    <section class="resource-strip student-category">
+      <h3>Download Notes</h3>
+      ${notes.length ? notes.map((note) => studentNoteCard(note)).join("") : `<div class="empty">No notes for this date.</div>`}
+    </section>
+
+    <section class="resource-strip student-category">
+      <h3>Download Homework</h3>
+      ${homework.length ? homework.map((assignment) => studentHomeworkDownloadCard(assignment)).join("") : `<div class="empty">No homework files for this date.</div>`}
+    </section>
+
+    <section class="resource-strip student-category">
+      <h3>Upload Homework</h3>
+      ${homework.length ? homework.map((assignment) => studentAssignmentCard(assignment, assignmentData)).join("") : `<div class="empty">No homework to submit for this date.</div>`}
+    </section>
+  `;
+}
+
+function teacherNoteCard(note) {
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill">Note</span>
+          <h3>${escapeHtml(note.title)}</h3>
+          <p>${escapeHtml(note.instructions)}</p>
+        </div>
+        <button class="danger-button" type="button" data-action="delete-assignment" data-assignment-id="${note.id}">Delete</button>
+      </div>
+      ${renderFileList(note.files)}
+    </article>
+  `;
+}
+
+function teacherHomeworkCard(assignment, assignmentData) {
+  const students = getUsers().filter((user) => user.role !== "teacher");
 
   return `
     <article class="assignment-card">
       <div class="assignment-head">
         <div>
+          <span class="pill">Homework</span>
           <h3>${escapeHtml(assignment.title)}</h3>
           <p>${escapeHtml(assignment.instructions)}</p>
         </div>
@@ -1036,51 +1108,100 @@ function teacherAssignmentCard(assignment, assignmentData) {
       </div>
       ${renderFileList(assignment.files)}
       <div class="submission-list">
-        <h4>Student submissions</h4>
-        ${submissions.length ? submissions.map((submission) => teacherSubmissionCard(submission)).join("") : `<div class="empty">No student submissions yet.</div>`}
+        <h4>Student status and private 1:1 comments</h4>
+        ${students.length ? students.map((student) => teacherStudentReviewCard(assignment, student.username, assignmentData)).join("") : `<div class="empty">No student accounts yet.</div>`}
       </div>
     </article>
   `;
 }
 
-function teacherSubmissionCard(submission) {
+function teacherStudentReviewCard(assignment, student, assignmentData) {
+  const submission = getStudentSubmission(assignmentData, assignment.id, student);
+  const review = getStudentReview(assignmentData, assignment.id, student);
+  const status = review?.status || (submission ? "Submitted" : "Not submitted");
+
   return `
     <article class="submission-card">
       <div class="submission-head">
-        <strong>${escapeHtml(submission.student)}</strong>
-        <span>${formatDateTime(submission.submittedAt)}</span>
-      </div>
-      ${submission.note ? `<p>${escapeHtml(submission.note)}</p>` : ""}
-      ${renderFileList(submission.files)}
-      <form class="form feedback-form" data-form="feedback">
-        <input type="hidden" name="submissionId" value="${submission.id}">
-        <div class="field">
-          <label for="feedback-${submission.id}">Teacher feedback</label>
-          <textarea id="feedback-${submission.id}" name="feedback" placeholder="Write feedback for this submission.">${escapeHtml(submission.feedback || "")}</textarea>
+        <div>
+          <strong>${escapeHtml(student)}</strong>
+          <span>${submission ? `Submitted ${formatDateTime(submission.submittedAt)}` : "No submission yet"}</span>
         </div>
-        <button class="secondary-button" type="submit">Save Feedback</button>
-        ${submission.feedbackAt ? `<span class="pill">Saved ${formatDateTime(submission.feedbackAt)}</span>` : ""}
+        <span class="pill">${escapeHtml(status)}</span>
+      </div>
+      ${submission?.note ? `<p>${escapeHtml(submission.note)}</p>` : ""}
+      ${submission ? renderFileList(submission.files) : `<div class="file-list empty">No submitted files.</div>`}
+      <form class="form feedback-form" data-form="review">
+        <input type="hidden" name="assignmentId" value="${assignment.id}">
+        <input type="hidden" name="student" value="${escapeHtml(student)}">
+        <div class="field">
+          <label>Submission status</label>
+          <select class="status-select" name="status">
+            ${statusOptions(status)}
+          </select>
+        </div>
+        <div class="field">
+          <label>Private 1:1 comment</label>
+          <textarea name="comment" placeholder="Only you and ${escapeHtml(student)} should see this comment.">${escapeHtml(review?.comment || "")}</textarea>
+        </div>
+        <button class="secondary-button" type="submit">Save Status and Comment</button>
+        ${review?.updatedAt ? `<span class="pill">Saved ${formatDateTime(review.updatedAt)}</span>` : ""}
       </form>
     </article>
   `;
 }
 
+function statusOptions(selectedStatus) {
+  return HOMEWORK_STATUSES
+    .map((status) => `<option value="${status}" ${status === selectedStatus ? "selected" : ""}>${status}</option>`)
+    .join("");
+}
+
+function studentNoteCard(note) {
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill">Note</span>
+          <h3>${escapeHtml(note.title)}</h3>
+          <p>${escapeHtml(note.instructions)}</p>
+        </div>
+      </div>
+      ${renderFileList(note.files)}
+    </article>
+  `;
+}
+
+function studentHomeworkDownloadCard(assignment) {
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill">Homework</span>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p>${escapeHtml(assignment.instructions)}</p>
+        </div>
+      </div>
+      ${renderFileList(assignment.files)}
+    </article>
+  `;
+}
+
 function studentAssignmentCard(assignment, assignmentData) {
-  const submission = assignmentData.submissions.find((item) => (
-    item.assignmentId === assignment.id && item.student === currentUser.username
-  ));
+  const submission = getStudentSubmission(assignmentData, assignment.id, currentUser.username);
+  const review = getStudentReview(assignmentData, assignment.id, currentUser.username);
+  const status = review?.status || (submission ? "Submitted" : "Not submitted");
 
   return `
     <article class="assignment-card">
       <div class="assignment-head">
         <div>
+          <span class="pill">${escapeHtml(status)}</span>
           <h3>${escapeHtml(assignment.title)}</h3>
           <p>${escapeHtml(assignment.instructions)}</p>
         </div>
-        <span class="pill">${submission ? "Submitted" : "Not submitted"}</span>
       </div>
-      ${renderFileList(assignment.files)}
-      ${submission ? studentSubmissionSummary(submission) : ""}
+      ${submission ? studentSubmissionSummary(submission, review) : studentPrivateReview(review)}
       <form class="form submission-form" data-form="submission">
         <input type="hidden" name="assignmentId" value="${assignment.id}">
         <div class="field">
@@ -1097,7 +1218,7 @@ function studentAssignmentCard(assignment, assignmentData) {
   `;
 }
 
-function studentSubmissionSummary(submission) {
+function studentSubmissionSummary(submission, review) {
   return `
     <div class="submission-card">
       <div class="submission-head">
@@ -1105,20 +1226,67 @@ function studentSubmissionSummary(submission) {
         <span>${formatDateTime(submission.submittedAt)}</span>
       </div>
       ${renderFileList(submission.files)}
-      ${submission.feedback ? `
-        <div class="feedback show correct">
-          <strong>Teacher feedback</strong>
-          ${escapeHtml(submission.feedback)}
-        </div>
-      ` : `<div class="feedback show">No teacher feedback yet.</div>`}
+      ${studentPrivateReview(review)}
     </div>
   `;
+}
+
+function studentPrivateReview(review) {
+  if (!review?.comment) {
+    return `<div class="feedback show">No private teacher comment yet.</div>`;
+  }
+
+  return `
+    <div class="feedback show correct">
+      <strong>Private teacher comment</strong>
+      ${escapeHtml(review.comment)}
+    </div>
+  `;
+}
+
+function getResourceType(assignment) {
+  return assignment?.type === "note" ? "note" : "homework";
+}
+
+function labelForResourceType(type) {
+  return type === "note" ? "Notes" : "Homework";
+}
+
+function getStudentSubmission(assignmentData, assignmentId, student) {
+  return assignmentData.submissions.find((item) => (
+    item.assignmentId === assignmentId && item.student === student
+  ));
+}
+
+function getStudentReview(assignmentData, assignmentId, student) {
+  const review = (assignmentData.reviews || []).find((item) => (
+    item.assignmentId === assignmentId && item.student === student
+  ));
+
+  if (review) return review;
+
+  const legacySubmission = getStudentSubmission(assignmentData, assignmentId, student);
+  if (legacySubmission?.feedback) {
+    return {
+      status: legacySubmission.correctedStatus || "Reviewed",
+      comment: legacySubmission.feedback,
+      updatedAt: legacySubmission.feedbackAt,
+      updatedBy: legacySubmission.feedbackBy
+    };
+  }
+
+  return null;
 }
 
 function teacherCoursewareList(assignmentData) {
   const files = assignmentData.assignments
     .filter((assignment) => assignment.teacher === currentUser.username)
-    .flatMap((assignment) => (assignment.files || []).map((file) => ({ ...file, assignmentTitle: assignment.title, date: assignment.date })))
+    .flatMap((assignment) => (assignment.files || []).map((file) => ({
+      ...file,
+      assignmentTitle: assignment.title,
+      date: assignment.date,
+      resourceType: getResourceType(assignment)
+    })))
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 
   if (!files.length) return `<div class="empty">No courseware uploaded yet.</div>`;
@@ -1129,7 +1297,7 @@ function teacherCoursewareList(assignmentData) {
         <div class="file-row">
           <div>
             <strong>${escapeHtml(file.name)}</strong>
-            <span>${escapeHtml(file.assignmentTitle)} · ${formatDateForDisplay(file.date)} · ${formatFileSize(file.size)}</span>
+            <span>${escapeHtml(labelForResourceType(file.resourceType))} · ${escapeHtml(file.assignmentTitle)} · ${formatDateForDisplay(file.date)} · ${formatFileSize(file.size)}</span>
           </div>
           <button class="ghost-button" type="button" data-action="download-file" data-file-id="${file.id}">Download</button>
         </div>
@@ -1171,9 +1339,11 @@ function calendarCells(monthDate, assignmentData) {
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateKey = toDateKey(new Date(year, month, day));
     const assignments = assignmentData.assignments.filter((assignment) => assignment.date === dateKey);
+    const notes = assignments.filter((assignment) => getResourceType(assignment) === "note");
+    const homework = assignments.filter((assignment) => getResourceType(assignment) === "homework");
     const submissions = assignmentData.submissions.filter((submission) => {
       const assignment = assignmentData.assignments.find((item) => item.id === submission.assignmentId);
-      return assignment?.date === dateKey;
+      return assignment?.date === dateKey && getResourceType(assignment) === "homework";
     });
     const selected = selectedCalendarDate === dateKey ? "selected" : "";
     const today = toDateKey(new Date()) === dateKey ? "today" : "";
@@ -1181,7 +1351,8 @@ function calendarCells(monthDate, assignmentData) {
     cells.push(`
       <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}">
         <strong>${day}</strong>
-        <span>${assignments.length ? `${assignments.length} homework` : ""}</span>
+        <span>${notes.length ? `${notes.length} notes` : ""}</span>
+        <span>${homework.length ? `${homework.length} homework` : ""}</span>
         <small>${submissions.length ? `${submissions.length} submitted` : ""}</small>
       </button>
     `);
@@ -1387,18 +1558,20 @@ function savePracticeData(data) {
 
 function getAssignmentData() {
   const data = safeJson(localStorage.getItem(ASSIGNMENTS_KEY), null);
-  if (!data) return { assignments: [], submissions: [] };
+  if (!data) return { assignments: [], submissions: [], reviews: [] };
 
   return {
     assignments: Array.isArray(data.assignments) ? data.assignments : [],
-    submissions: Array.isArray(data.submissions) ? data.submissions : []
+    submissions: Array.isArray(data.submissions) ? data.submissions : [],
+    reviews: Array.isArray(data.reviews) ? data.reviews : []
   };
 }
 
 function saveAssignmentData(data) {
   localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify({
     assignments: data.assignments || [],
-    submissions: data.submissions || []
+    submissions: data.submissions || [],
+    reviews: data.reviews || []
   }));
 }
 
@@ -1406,6 +1579,7 @@ async function saveAssignment(form) {
   if (currentUser.role !== "teacher") return;
 
   const date = form.elements.assignmentDate.value;
+  const kind = form.elements.assignmentKind.value === "note" ? "note" : "homework";
   const title = form.elements.assignmentTitle.value.trim();
   const instructions = form.elements.assignmentInstructions.value.trim();
   const files = Array.from(form.elements.assignmentFiles.files || []);
@@ -1418,7 +1592,7 @@ async function saveAssignment(form) {
   try {
     const assignmentId = createId("assignment");
     const fileRecords = await storeFiles(files, {
-      kind: "courseware",
+      kind,
       owner: currentUser.username,
       assignmentId
     });
@@ -1427,6 +1601,7 @@ async function saveAssignment(form) {
 
     data.assignments.push({
       id: assignmentId,
+      type: kind,
       date,
       title,
       instructions,
@@ -1439,7 +1614,7 @@ async function saveAssignment(form) {
     saveAssignmentData(data);
     selectedCalendarDate = date;
     calendarMonth = parseDateKey(date);
-    renderCalendarView(date, "Homework uploaded.");
+    renderCalendarView(date, `${labelForResourceType(kind)} uploaded.`);
   } catch (error) {
     renderCalendarView(date, `Upload failed: ${error.message}`);
   }
@@ -1462,6 +1637,11 @@ async function saveSubmission(form) {
     return;
   }
 
+  if (getResourceType(assignment) !== "homework") {
+    renderCalendarView(assignment.date, "Notes are download-only. Submit files under homework.");
+    return;
+  }
+
   if (!files.length && !note && !existing) {
     renderCalendarView(assignment.date, "Add a file or a note before submitting.");
     return;
@@ -1481,9 +1661,6 @@ async function saveSubmission(form) {
       existing.note = note;
       existing.files = fileRecords;
       existing.submittedAt = now;
-      existing.feedback = "";
-      existing.feedbackAt = "";
-      existing.feedbackBy = "";
     } else {
       data.submissions.push({
         id: createId("submission"),
@@ -1491,10 +1668,7 @@ async function saveSubmission(form) {
         student: currentUser.username,
         note,
         files: fileRecords,
-        submittedAt: now,
-        feedback: "",
-        feedbackAt: "",
-        feedbackBy: ""
+        submittedAt: now
       });
     }
 
@@ -1505,26 +1679,46 @@ async function saveSubmission(form) {
   }
 }
 
-function saveFeedback(form) {
+function saveReview(form) {
   if (currentUser.role !== "teacher") return;
 
-  const submissionId = form.elements.submissionId.value;
-  const feedback = form.elements.feedback.value.trim();
+  const assignmentId = form.elements.assignmentId.value;
+  const student = form.elements.student.value;
+  const status = form.elements.status.value;
+  const comment = form.elements.comment.value.trim();
   const data = getAssignmentData();
-  const submission = data.submissions.find((item) => item.id === submissionId);
+  const assignment = data.assignments.find((item) => item.id === assignmentId);
 
-  if (!submission) {
-    renderCalendarView(selectedCalendarDate, "Submission not found.");
+  if (!assignment || getResourceType(assignment) !== "homework") {
+    renderCalendarView(selectedCalendarDate, "Homework not found.");
     return;
   }
 
-  submission.feedback = feedback;
-  submission.feedbackAt = new Date().toISOString();
-  submission.feedbackBy = currentUser.username;
-  saveAssignmentData(data);
+  data.reviews = data.reviews || [];
+  const existing = data.reviews.find((item) => (
+    item.assignmentId === assignmentId && item.student === student
+  ));
+  const now = new Date().toISOString();
 
-  const assignment = data.assignments.find((item) => item.id === submission.assignmentId);
-  renderCalendarView(assignment?.date || selectedCalendarDate, "Feedback saved.");
+  if (existing) {
+    existing.status = status;
+    existing.comment = comment;
+    existing.updatedAt = now;
+    existing.updatedBy = currentUser.username;
+  } else {
+    data.reviews.push({
+      id: createId("review"),
+      assignmentId,
+      student,
+      status,
+      comment,
+      updatedAt: now,
+      updatedBy: currentUser.username
+    });
+  }
+
+  saveAssignmentData(data);
+  renderCalendarView(assignment.date, "Private status and comment saved.");
 }
 
 function deleteAssignment(assignmentId) {
@@ -1537,8 +1731,9 @@ function deleteAssignment(assignmentId) {
 
   data.assignments = data.assignments.filter((item) => item.id !== assignmentId);
   data.submissions = data.submissions.filter((item) => item.assignmentId !== assignmentId);
+  data.reviews = (data.reviews || []).filter((item) => item.assignmentId !== assignmentId);
   saveAssignmentData(data);
-  renderCalendarView(assignment.date, "Homework deleted.");
+  renderCalendarView(assignment.date, `${labelForResourceType(getResourceType(assignment))} deleted.`);
 }
 
 async function storeFiles(files, context) {
@@ -1881,7 +2076,7 @@ function formatFileSize(size) {
 }
 
 function calendarMessageClass(message) {
-  return /uploaded|submitted|saved|deleted/i.test(message) ? "ok" : "";
+  return /uploaded|submitted|saved|deleted|private/i.test(message) ? "ok" : "";
 }
 
 function safeJson(value, fallback) {
