@@ -58,7 +58,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
@@ -241,6 +242,7 @@ html.dark .score-card {
 }
 
 .field input,
+.field textarea,
 .answer-input {
   width: 100%;
   border: 1px solid var(--line);
@@ -252,7 +254,18 @@ html.dark .score-card {
   transition: border var(--ease), box-shadow var(--ease), transform var(--ease);
 }
 
+.field textarea {
+  min-height: 108px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.field input[type="file"] {
+  padding: 11px;
+}
+
 .field input:focus,
+.field textarea:focus,
 .answer-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
@@ -532,6 +545,177 @@ html.dark .score-card {
   gap: 16px;
 }
 
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.calendar-panel,
+.date-panel {
+  padding: 20px;
+}
+
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.calendar-toolbar h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calendar-weekday {
+  padding: 6px 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-cell {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 82px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition: border var(--ease), transform var(--ease), box-shadow var(--ease);
+}
+
+.calendar-cell:not(.calendar-empty):hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.45);
+}
+
+.calendar-cell strong {
+  font-size: 0.95rem;
+}
+
+.calendar-cell span,
+.calendar-cell small {
+  min-height: 14px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.calendar-cell.today {
+  background: var(--accent-soft);
+}
+
+.calendar-cell.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.calendar-empty {
+  pointer-events: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.compact-head {
+  margin-bottom: 10px;
+}
+
+.assignment-form,
+.submission-form,
+.feedback-form {
+  margin: 14px 0 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.assignment-stack {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.assignment-card,
+.submission-card,
+.resource-strip {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.assignment-head,
+.submission-head,
+.file-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assignment-head h3,
+.resource-strip h3,
+.submission-list h4 {
+  margin: 0;
+}
+
+.assignment-head p,
+.submission-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.submission-head span,
+.file-row span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.submission-list {
+  display: grid;
+  gap: 10px;
+}
+
+.file-list {
+  display: grid;
+  gap: 8px;
+}
+
+.file-row {
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.file-row strong {
+  overflow-wrap: anywhere;
+}
+
 .student-list {
   display: grid;
   gap: 10px;
@@ -641,7 +825,8 @@ th {
 
 @media (max-width: 940px) {
   .hero,
-  .teacher-grid {
+  .teacher-grid,
+  .calendar-layout {
     grid-template-columns: 1fr;
   }
 
@@ -681,5 +866,26 @@ th {
 
   .category-card {
     min-height: auto;
+  }
+
+  .calendar-grid {
+    gap: 5px;
+  }
+
+  .calendar-cell {
+    min-height: 68px;
+    padding: 7px;
+  }
+
+  .calendar-cell span,
+  .calendar-cell small {
+    font-size: 0.66rem;
+  }
+
+  .assignment-head,
+  .submission-head,
+  .file-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

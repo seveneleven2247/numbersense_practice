@@ -2,8 +2,11 @@ const TEACHER_USERNAME = "Elven Zeng";
 const TEACHER_PASSWORD = "Elven2026!";
 const USERS_KEY = "numberSensePractice.users.v1";
 const DATA_KEY = "numberSensePractice.data.v1";
+const ASSIGNMENTS_KEY = "numberSensePractice.assignments.v1";
 const SESSION_KEY = "numberSensePractice.currentUser.v1";
 const THEME_KEY = "numberSensePractice.theme.v1";
+const FILE_DB_NAME = "numberSensePractice.files.v1";
+const FILE_STORE_NAME = "files";
 
 const categories = [
   {
@@ -468,6 +471,8 @@ let currentUser = null;
 let authMode = "login";
 let practiceSession = null;
 let timerId = null;
+let calendarMonth = new Date();
+let selectedCalendarDate = toDateKey(new Date());
 
 const app = document.querySelector("#app");
 const logoutButton = document.querySelector("[data-action='logout']");
@@ -528,6 +533,36 @@ function handleGlobalClick(event) {
     renderTeacherDashboard();
   }
 
+  if (action === "calendar") {
+    renderCalendarView();
+  }
+
+  if (action === "calendar-prev") {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    selectedCalendarDate = toDateKey(calendarMonth);
+    renderCalendarView(selectedCalendarDate);
+  }
+
+  if (action === "calendar-next") {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+    selectedCalendarDate = toDateKey(calendarMonth);
+    renderCalendarView(selectedCalendarDate);
+  }
+
+  if (action === "select-date") {
+    selectedCalendarDate = actionTarget.dataset.date;
+    calendarMonth = parseDateKey(selectedCalendarDate);
+    renderCalendarView(selectedCalendarDate);
+  }
+
+  if (action === "download-file") {
+    downloadStoredFile(actionTarget.dataset.fileId);
+  }
+
+  if (action === "delete-assignment") {
+    deleteAssignment(actionTarget.dataset.assignmentId);
+  }
+
   if (action === "start-category") {
     startCategory(actionTarget.dataset.categoryId);
   }
@@ -567,6 +602,18 @@ function handleSubmit(event) {
     } else {
       register(form);
     }
+  }
+
+  if (form.dataset.form === "assignment") {
+    saveAssignment(form);
+  }
+
+  if (form.dataset.form === "submission") {
+    saveSubmission(form);
+  }
+
+  if (form.dataset.form === "feedback") {
+    saveFeedback(form);
   }
 }
 
@@ -634,6 +681,7 @@ function renderHome() {
         </div>
         <div class="button-row">
           ${teacherButton}
+          <button class="secondary-button" type="button" data-action="calendar">Calendar</button>
           <button class="primary-button" type="button" data-action="categories">Choose Category</button>
         </div>
       </div>
@@ -880,6 +928,268 @@ function renderScore(category, score, answered) {
   `;
 }
 
+function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
+  stopTimer();
+  selectedCalendarDate = dateKey || toDateKey(new Date());
+  const assignmentData = getAssignmentData();
+  const selectedDateAssignments = assignmentData.assignments
+    .filter((assignment) => assignment.date === selectedCalendarDate)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const isTeacher = currentUser.role === "teacher";
+
+  app.innerHTML = `
+    <section>
+      <div class="section-head">
+        <div>
+          <h1>Calendar</h1>
+          <p>${isTeacher ? "Upload lessons, publish homework, and review student submissions." : "Find homework by date and submit your files."}</p>
+        </div>
+        <div class="button-row">
+          ${isTeacher ? `<button class="secondary-button" type="button" data-action="teacher">Teacher Dashboard</button>` : ""}
+          <button class="ghost-button" type="button" data-action="home">Home</button>
+        </div>
+      </div>
+
+      <div class="calendar-layout">
+        <section class="panel calendar-panel">
+          <div class="calendar-toolbar">
+            <button class="ghost-button" type="button" data-action="calendar-prev">Prev</button>
+            <h2>${monthTitle(calendarMonth)}</h2>
+            <button class="ghost-button" type="button" data-action="calendar-next">Next</button>
+          </div>
+          <div class="calendar-grid" aria-label="Assignment calendar">
+            ${calendarWeekdays().map((day) => `<span class="calendar-weekday">${day}</span>`).join("")}
+            ${calendarCells(calendarMonth, assignmentData).join("")}
+          </div>
+        </section>
+
+        <section class="panel date-panel">
+          <div class="section-head compact-head">
+            <div>
+              <h2>${formatDateForDisplay(selectedCalendarDate)}</h2>
+              <p>${selectedDateAssignments.length} assignment${selectedDateAssignments.length === 1 ? "" : "s"} on this date</p>
+            </div>
+          </div>
+          ${message ? `<div class="message ${calendarMessageClass(message)}">${escapeHtml(message)}</div>` : ""}
+          ${isTeacher ? teacherCalendarTools(selectedDateAssignments, assignmentData) : studentCalendarTools(selectedDateAssignments, assignmentData)}
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function teacherCalendarTools(assignmentsForDate, assignmentData) {
+  return `
+    <form class="form assignment-form" data-form="assignment">
+      <input type="hidden" name="assignmentDate" value="${selectedCalendarDate}">
+      <div class="field">
+        <label for="assignmentTitle">Homework title</label>
+        <input id="assignmentTitle" name="assignmentTitle" placeholder="Example: Estimation practice set" required>
+      </div>
+      <div class="field">
+        <label for="assignmentInstructions">Instructions</label>
+        <textarea id="assignmentInstructions" name="assignmentInstructions" placeholder="Write the homework instructions or lesson notes." required></textarea>
+      </div>
+      <div class="field">
+        <label for="assignmentFiles">Lesson files or homework files</label>
+        <input id="assignmentFiles" name="assignmentFiles" type="file" multiple>
+      </div>
+      <button class="primary-button" type="submit">Upload to This Date</button>
+    </form>
+
+    <div class="assignment-stack">
+      ${assignmentsForDate.length ? assignmentsForDate.map((assignment) => teacherAssignmentCard(assignment, assignmentData)).join("") : `<div class="empty">No homework uploaded for this date yet.</div>`}
+    </div>
+
+    <section class="resource-strip">
+      <h3>My Uploaded Courseware</h3>
+      ${teacherCoursewareList(assignmentData)}
+    </section>
+  `;
+}
+
+function studentCalendarTools(assignmentsForDate, assignmentData) {
+  if (!assignmentsForDate.length) {
+    return `<div class="empty">No homework for this date.</div>`;
+  }
+
+  return `
+    <div class="assignment-stack">
+      ${assignmentsForDate.map((assignment) => studentAssignmentCard(assignment, assignmentData)).join("")}
+    </div>
+  `;
+}
+
+function teacherAssignmentCard(assignment, assignmentData) {
+  const submissions = assignmentData.submissions
+    .filter((submission) => submission.assignmentId === assignment.id)
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p>${escapeHtml(assignment.instructions)}</p>
+        </div>
+        <button class="danger-button" type="button" data-action="delete-assignment" data-assignment-id="${assignment.id}">Delete</button>
+      </div>
+      ${renderFileList(assignment.files)}
+      <div class="submission-list">
+        <h4>Student submissions</h4>
+        ${submissions.length ? submissions.map((submission) => teacherSubmissionCard(submission)).join("") : `<div class="empty">No student submissions yet.</div>`}
+      </div>
+    </article>
+  `;
+}
+
+function teacherSubmissionCard(submission) {
+  return `
+    <article class="submission-card">
+      <div class="submission-head">
+        <strong>${escapeHtml(submission.student)}</strong>
+        <span>${formatDateTime(submission.submittedAt)}</span>
+      </div>
+      ${submission.note ? `<p>${escapeHtml(submission.note)}</p>` : ""}
+      ${renderFileList(submission.files)}
+      <form class="form feedback-form" data-form="feedback">
+        <input type="hidden" name="submissionId" value="${submission.id}">
+        <div class="field">
+          <label for="feedback-${submission.id}">Teacher feedback</label>
+          <textarea id="feedback-${submission.id}" name="feedback" placeholder="Write feedback for this submission.">${escapeHtml(submission.feedback || "")}</textarea>
+        </div>
+        <button class="secondary-button" type="submit">Save Feedback</button>
+        ${submission.feedbackAt ? `<span class="pill">Saved ${formatDateTime(submission.feedbackAt)}</span>` : ""}
+      </form>
+    </article>
+  `;
+}
+
+function studentAssignmentCard(assignment, assignmentData) {
+  const submission = assignmentData.submissions.find((item) => (
+    item.assignmentId === assignment.id && item.student === currentUser.username
+  ));
+
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p>${escapeHtml(assignment.instructions)}</p>
+        </div>
+        <span class="pill">${submission ? "Submitted" : "Not submitted"}</span>
+      </div>
+      ${renderFileList(assignment.files)}
+      ${submission ? studentSubmissionSummary(submission) : ""}
+      <form class="form submission-form" data-form="submission">
+        <input type="hidden" name="assignmentId" value="${assignment.id}">
+        <div class="field">
+          <label for="submissionNote-${assignment.id}">Submission note</label>
+          <textarea id="submissionNote-${assignment.id}" name="submissionNote" placeholder="Write a short note for your teacher.">${submission ? escapeHtml(submission.note || "") : ""}</textarea>
+        </div>
+        <div class="field">
+          <label for="submissionFiles-${assignment.id}">Upload homework files</label>
+          <input id="submissionFiles-${assignment.id}" name="submissionFiles" type="file" multiple>
+        </div>
+        <button class="primary-button" type="submit">${submission ? "Resubmit Homework" : "Submit Homework"}</button>
+      </form>
+    </article>
+  `;
+}
+
+function studentSubmissionSummary(submission) {
+  return `
+    <div class="submission-card">
+      <div class="submission-head">
+        <strong>Your submission</strong>
+        <span>${formatDateTime(submission.submittedAt)}</span>
+      </div>
+      ${renderFileList(submission.files)}
+      ${submission.feedback ? `
+        <div class="feedback show correct">
+          <strong>Teacher feedback</strong>
+          ${escapeHtml(submission.feedback)}
+        </div>
+      ` : `<div class="feedback show">No teacher feedback yet.</div>`}
+    </div>
+  `;
+}
+
+function teacherCoursewareList(assignmentData) {
+  const files = assignmentData.assignments
+    .filter((assignment) => assignment.teacher === currentUser.username)
+    .flatMap((assignment) => (assignment.files || []).map((file) => ({ ...file, assignmentTitle: assignment.title, date: assignment.date })))
+    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+
+  if (!files.length) return `<div class="empty">No courseware uploaded yet.</div>`;
+
+  return `
+    <div class="file-list">
+      ${files.map((file) => `
+        <div class="file-row">
+          <div>
+            <strong>${escapeHtml(file.name)}</strong>
+            <span>${escapeHtml(file.assignmentTitle)} · ${formatDateForDisplay(file.date)} · ${formatFileSize(file.size)}</span>
+          </div>
+          <button class="ghost-button" type="button" data-action="download-file" data-file-id="${file.id}">Download</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderFileList(files = []) {
+  if (!files.length) return `<div class="file-list empty">No files attached.</div>`;
+
+  return `
+    <div class="file-list">
+      ${files.map((file) => `
+        <div class="file-row">
+          <div>
+            <strong>${escapeHtml(file.name)}</strong>
+            <span>${formatFileSize(file.size)} · ${escapeHtml(file.type || "file")}</span>
+          </div>
+          <button class="ghost-button" type="button" data-action="download-file" data-file-id="${file.id}">Download</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function calendarCells(monthDate, assignmentData) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+
+  for (let index = 0; index < startOffset; index += 1) {
+    cells.push(`<span class="calendar-cell calendar-empty"></span>`);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = toDateKey(new Date(year, month, day));
+    const assignments = assignmentData.assignments.filter((assignment) => assignment.date === dateKey);
+    const submissions = assignmentData.submissions.filter((submission) => {
+      const assignment = assignmentData.assignments.find((item) => item.id === submission.assignmentId);
+      return assignment?.date === dateKey;
+    });
+    const selected = selectedCalendarDate === dateKey ? "selected" : "";
+    const today = toDateKey(new Date()) === dateKey ? "today" : "";
+
+    cells.push(`
+      <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}">
+        <strong>${day}</strong>
+        <span>${assignments.length ? `${assignments.length} homework` : ""}</span>
+        <small>${submissions.length ? `${submissions.length} submitted` : ""}</small>
+      </button>
+    `);
+  }
+
+  return cells;
+}
+
 function renderTeacherDashboard(selectedUsername = "") {
   if (!currentUser || currentUser.role !== "teacher") {
     renderHome();
@@ -898,7 +1208,10 @@ function renderTeacherDashboard(selectedUsername = "") {
           <h1>Teacher Dashboard</h1>
           <p>Signed in as ${TEACHER_USERNAME}</p>
         </div>
-        <button class="secondary-button" type="button" data-action="categories">Open Practice</button>
+        <div class="button-row">
+          <button class="secondary-button" type="button" data-action="calendar">Calendar</button>
+          <button class="secondary-button" type="button" data-action="categories">Open Practice</button>
+        </div>
       </div>
 
       <div class="teacher-grid">
@@ -1070,6 +1383,267 @@ function getPracticeData() {
 
 function savePracticeData(data) {
   localStorage.setItem(DATA_KEY, JSON.stringify(data));
+}
+
+function getAssignmentData() {
+  const data = safeJson(localStorage.getItem(ASSIGNMENTS_KEY), null);
+  if (!data) return { assignments: [], submissions: [] };
+
+  return {
+    assignments: Array.isArray(data.assignments) ? data.assignments : [],
+    submissions: Array.isArray(data.submissions) ? data.submissions : []
+  };
+}
+
+function saveAssignmentData(data) {
+  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify({
+    assignments: data.assignments || [],
+    submissions: data.submissions || []
+  }));
+}
+
+async function saveAssignment(form) {
+  if (currentUser.role !== "teacher") return;
+
+  const date = form.elements.assignmentDate.value;
+  const title = form.elements.assignmentTitle.value.trim();
+  const instructions = form.elements.assignmentInstructions.value.trim();
+  const files = Array.from(form.elements.assignmentFiles.files || []);
+
+  if (!date || !title || !instructions) {
+    renderCalendarView(date || selectedCalendarDate, "Please add a date, title, and instructions.");
+    return;
+  }
+
+  try {
+    const assignmentId = createId("assignment");
+    const fileRecords = await storeFiles(files, {
+      kind: "courseware",
+      owner: currentUser.username,
+      assignmentId
+    });
+    const data = getAssignmentData();
+    const now = new Date().toISOString();
+
+    data.assignments.push({
+      id: assignmentId,
+      date,
+      title,
+      instructions,
+      teacher: currentUser.username,
+      files: fileRecords,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    saveAssignmentData(data);
+    selectedCalendarDate = date;
+    calendarMonth = parseDateKey(date);
+    renderCalendarView(date, "Homework uploaded.");
+  } catch (error) {
+    renderCalendarView(date, `Upload failed: ${error.message}`);
+  }
+}
+
+async function saveSubmission(form) {
+  if (currentUser.role !== "student") return;
+
+  const assignmentId = form.elements.assignmentId.value;
+  const note = form.elements.submissionNote.value.trim();
+  const files = Array.from(form.elements.submissionFiles.files || []);
+  const data = getAssignmentData();
+  const assignment = data.assignments.find((item) => item.id === assignmentId);
+  const existing = data.submissions.find((item) => (
+    item.assignmentId === assignmentId && item.student === currentUser.username
+  ));
+
+  if (!assignment) {
+    renderCalendarView(selectedCalendarDate, "This homework no longer exists.");
+    return;
+  }
+
+  if (!files.length && !note && !existing) {
+    renderCalendarView(assignment.date, "Add a file or a note before submitting.");
+    return;
+  }
+
+  try {
+    const fileRecords = files.length
+      ? await storeFiles(files, {
+          kind: "submission",
+          owner: currentUser.username,
+          assignmentId
+        })
+      : existing?.files || [];
+    const now = new Date().toISOString();
+
+    if (existing) {
+      existing.note = note;
+      existing.files = fileRecords;
+      existing.submittedAt = now;
+      existing.feedback = "";
+      existing.feedbackAt = "";
+      existing.feedbackBy = "";
+    } else {
+      data.submissions.push({
+        id: createId("submission"),
+        assignmentId,
+        student: currentUser.username,
+        note,
+        files: fileRecords,
+        submittedAt: now,
+        feedback: "",
+        feedbackAt: "",
+        feedbackBy: ""
+      });
+    }
+
+    saveAssignmentData(data);
+    renderCalendarView(assignment.date, "Homework submitted.");
+  } catch (error) {
+    renderCalendarView(assignment.date, `Submission failed: ${error.message}`);
+  }
+}
+
+function saveFeedback(form) {
+  if (currentUser.role !== "teacher") return;
+
+  const submissionId = form.elements.submissionId.value;
+  const feedback = form.elements.feedback.value.trim();
+  const data = getAssignmentData();
+  const submission = data.submissions.find((item) => item.id === submissionId);
+
+  if (!submission) {
+    renderCalendarView(selectedCalendarDate, "Submission not found.");
+    return;
+  }
+
+  submission.feedback = feedback;
+  submission.feedbackAt = new Date().toISOString();
+  submission.feedbackBy = currentUser.username;
+  saveAssignmentData(data);
+
+  const assignment = data.assignments.find((item) => item.id === submission.assignmentId);
+  renderCalendarView(assignment?.date || selectedCalendarDate, "Feedback saved.");
+}
+
+function deleteAssignment(assignmentId) {
+  if (currentUser.role !== "teacher") return;
+  if (!window.confirm("Delete this homework and its submission records?")) return;
+
+  const data = getAssignmentData();
+  const assignment = data.assignments.find((item) => item.id === assignmentId);
+  if (!assignment) return;
+
+  data.assignments = data.assignments.filter((item) => item.id !== assignmentId);
+  data.submissions = data.submissions.filter((item) => item.assignmentId !== assignmentId);
+  saveAssignmentData(data);
+  renderCalendarView(assignment.date, "Homework deleted.");
+}
+
+async function storeFiles(files, context) {
+  const records = [];
+
+  for (const file of files) {
+    const record = {
+      id: createId("file"),
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+      uploadedBy: context.owner,
+      uploadedAt: new Date().toISOString(),
+      kind: context.kind,
+      assignmentId: context.assignmentId,
+      blob: file
+    };
+
+    await putFileRecord(record);
+    records.push({
+      id: record.id,
+      name: record.name,
+      type: record.type,
+      size: record.size,
+      uploadedBy: record.uploadedBy,
+      uploadedAt: record.uploadedAt,
+      kind: record.kind
+    });
+  }
+
+  return records;
+}
+
+function openFileDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FILE_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(FILE_STORE_NAME)) {
+        db.createObjectStore(FILE_STORE_NAME, { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function putFileRecord(record) {
+  const db = await openFileDb();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(FILE_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(FILE_STORE_NAME);
+    store.put(record);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+async function getFileRecord(fileId) {
+  const db = await openFileDb();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(FILE_STORE_NAME, "readonly");
+    const store = transaction.objectStore(FILE_STORE_NAME);
+    const request = store.get(fileId);
+
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      db.close();
+      reject(request.error);
+    };
+  });
+}
+
+async function downloadStoredFile(fileId) {
+  try {
+    const record = await getFileRecord(fileId);
+    if (!record) {
+      window.alert("File not found in this browser.");
+      return;
+    }
+
+    const url = URL.createObjectURL(record.blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = record.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    window.alert(`Could not open file: ${error.message}`);
+  }
 }
 
 function getCategoryData(username, categoryId, data = getPracticeData()) {
@@ -1249,6 +1823,65 @@ function shuffle(items) {
     [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
   }
   return items;
+}
+
+function createId(prefix) {
+  if (globalThis.crypto?.randomUUID) return `${prefix}-${globalThis.crypto.randomUUID()}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function monthTitle(date) {
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function calendarWeekdays() {
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+}
+
+function formatDateForDisplay(dateKey) {
+  return parseDateKey(dateKey).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function formatFileSize(size) {
+  if (!Number.isFinite(size)) return "Unknown size";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  return `${(size / 1024 / 1024 / 1024).toFixed(1)} GB`;
+}
+
+function calendarMessageClass(message) {
+  return /uploaded|submitted|saved|deleted/i.test(message) ? "ok" : "";
 }
 
 function safeJson(value, fallback) {
