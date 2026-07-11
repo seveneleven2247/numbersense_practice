@@ -4,7 +4,7 @@ const root = new URL("../", import.meta.url);
 const dist = new URL("../dist/", import.meta.url);
 const publicDir = new URL("../public/", import.meta.url);
 const appFiles = ["index.html", "styles.css", "app.js"];
-const cloudflareFiles = ["_headers", "_redirects"];
+const cloudflareFiles = ["_headers"];
 
 for (const outputDir of [dist, publicDir]) {
   await rm(outputDir, { recursive: true, force: true });
@@ -19,4 +19,4 @@ for (const outputDir of [dist, publicDir]) {
   }
 }
 
-console.log("Cloudflare Pages assets written to dist/ and public/");
+console.log("Cloudflare assets written to dist/ and public/");

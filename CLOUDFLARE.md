@@ -1,20 +1,25 @@
-# Cloudflare Pages 部署
+# Cloudflare 部署
 
-这个项目是加拿大 Grade 10 数感训练的纯静态网页，适合部署到 Cloudflare Pages。
+这个项目是加拿大 Grade 10 数感训练的纯静态网页。你现在创建的是 Cloudflare Workers 项目 `numbersensepractice2`，优先按 Workers 部署。
 
-## 方式一：连接 GitHub 仓库
+## 推荐方式：Cloudflare Workers
 
-1. 打开 Cloudflare Dashboard。
-2. 进入 Workers & Pages。
-3. 选择 Create application > Pages > Connect to Git。
-4. 选择仓库 `seveneleven2247/numbersense_practice`。
-5. 构建设置：
-   - Framework preset: None
-   - Build command: `exit 0`
-   - Build output directory: `public`
-6. 保存并部署。
+进入 Cloudflare Dashboard 里这个项目：
 
-以后推送到 GitHub 的 `main` 分支后，Cloudflare Pages 会自动重新部署。
+`Workers & Pages > numbersensepractice2 > Settings > Builds`
+
+确认设置：
+
+- Git repository: `seveneleven2247/numbersense_practice`
+- Production branch: `main`
+- Root directory: 留空
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Non-production deploy command: `npx wrangler versions upload`
+
+然后重新部署最新的 `main` 分支。
+
+项目里的 `wrangler.jsonc` 已经把 Worker 名称设为 `numbersensepractice2`，并把静态资源目录设为 `public`。
 
 ## 方式二：本地直接上传
 
@@ -30,7 +35,15 @@ npx wrangler login
 npm run cloudflare:deploy
 ```
 
-部署完成后，Cloudflare 会给出一个 `*.pages.dev` 地址。
+部署完成后，Cloudflare 会给出一个 `*.workers.dev` 地址。
+
+## 备用方式：Cloudflare Pages
+
+如果你新建的是 Pages 项目，而不是 Workers 项目，使用这些设置：
+
+- Framework preset: None
+- Build command: `npm run build`
+- Build output directory: `public`
 
 ## 本地预览
 
@@ -40,7 +53,12 @@ npm run cloudflare:preview
 
 ## 如果之前部署失败
 
-在 Cloudflare Pages 项目里进入 Settings > Builds & deployments，把 Build command 改成 `exit 0`，Build output directory 改成 `public`，然后重新部署最新的 `main` 分支。
+先确认你打开的是 Workers 还是 Pages：
+
+- 如果 URL 里有 `/workers/services/view/numbersensepractice2`，按上面的 Workers 设置。
+- 如果 URL 里是 Pages 项目，按备用的 Pages 设置。
+
+这个项目不再使用 `_redirects` 的 `/* /index.html 200` 规则，因为 Workers 会在静态文件存在时也执行 `_redirects`，会导致 `app.js` 和 `styles.css` 被重写成 HTML。SPA fallback 已经由 `wrangler.jsonc` 的 `assets.not_found_handling` 处理。
 
 ## 数据提醒
 

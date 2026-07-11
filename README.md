@@ -17,11 +17,11 @@
 
 练习记录保存在当前浏览器的本地存储中。若学生和老师不在同一台设备或同一个浏览器，可在教师页面使用“导出记录”和“导入记录”同步数据。
 
-## Cloudflare Pages
+## Cloudflare
 
-本项目已补充 Cloudflare Pages 部署配置。详见 `CLOUDFLARE.md`。
+本项目已补充 Cloudflare Workers 和 Pages 部署配置。详见 `CLOUDFLARE.md`。
 
-Cloudflare Pages 推荐设置：
+你当前的 Cloudflare Worker 名称是 `numbersensepractice2`，推荐设置：
 
-- Build command: `exit 0`
-- Build output directory: `public`
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`

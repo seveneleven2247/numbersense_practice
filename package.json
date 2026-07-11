@@ -2,12 +2,14 @@
   "name": "numbersense-practice",
   "version": "1.0.0",
   "private": true,
-  "description": "A 10-day number sense practice app for Cloudflare Pages.",
+  "description": "A 10-day number sense practice app for Cloudflare Workers and Pages.",
   "type": "module",
   "scripts": {
     "build": "node scripts/build-cloudflare.mjs",
     "cloudflare:build": "node scripts/build-cloudflare.mjs",
-    "cloudflare:preview": "npm run build && npx wrangler pages dev public",
-    "cloudflare:deploy": "npm run build && npx wrangler pages deploy public --project-name numbersense-practice"
+    "deploy": "npm run build && npx wrangler deploy",
+    "cloudflare:preview": "npm run build && npx wrangler dev",
+    "cloudflare:deploy": "npm run build && npx wrangler deploy",
+    "cloudflare:pages:deploy": "npm run build && npx wrangler pages deploy public --project-name numbersense-practice"
   }
 }
