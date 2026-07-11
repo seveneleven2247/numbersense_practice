@@ -39,7 +39,19 @@ npm run cloudflare:deploy
 
 ## 备用方式：Cloudflare Pages
 
-如果你新建的是 Pages 项目，而不是 Workers 项目，使用这些设置：
+如果你要部署到 `https://numbersensepractice.pages.dev/`，Pages 项目名应为：
+
+`numbersensepractice`
+
+本地直接部署：
+
+```bash
+npm run cloudflare:pages:deploy
+```
+
+这个脚本会使用 Cloudflare 账号 `5549f41d5fa87a72d0a1f313203437b1` 部署到 `numbersensepractice` Pages 项目。
+
+如果用 Cloudflare Dashboard 连接 GitHub，使用这些设置：
 
 - Framework preset: None
 - Build command: `npm run build`

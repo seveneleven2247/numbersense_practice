@@ -10,6 +10,6 @@
     "deploy": "npm run build && npx wrangler deploy",
     "cloudflare:preview": "npm run build && npx wrangler dev",
     "cloudflare:deploy": "npm run build && npx wrangler deploy",
-    "cloudflare:pages:deploy": "npm run build && npx wrangler pages deploy public --project-name numbersense-practice"
+    "cloudflare:pages:deploy": "npm run build && CLOUDFLARE_ACCOUNT_ID=5549f41d5fa87a72d0a1f313203437b1 npx wrangler pages deploy public --project-name numbersensepractice"
   }
 }
