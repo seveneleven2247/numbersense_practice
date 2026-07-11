@@ -10,8 +10,8 @@
 4. 选择仓库 `seveneleven2247/numbersense_practice`。
 5. 构建设置：
    - Framework preset: None
-   - Build command: `npm run build`
-   - Build output directory: `dist`
+   - Build command: `exit 0`
+   - Build output directory: `public`
 6. 保存并部署。
 
 以后推送到 GitHub 的 `main` 分支后，Cloudflare Pages 会自动重新部署。
@@ -37,6 +37,10 @@ npm run cloudflare:deploy
 ```bash
 npm run cloudflare:preview
 ```
+
+## 如果之前部署失败
+
+在 Cloudflare Pages 项目里进入 Settings > Builds & deployments，把 Build command 改成 `exit 0`，Build output directory 改成 `public`，然后重新部署最新的 `main` 分支。
 
 ## 数据提醒
 
