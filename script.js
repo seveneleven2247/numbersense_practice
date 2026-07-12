@@ -514,7 +514,7 @@ function finishPractice() {
       <p>${scoreMessage(accuracy)}</p>
       <div class="button-row center">
         <button class="primary-button" type="button" data-action="restart-session">Restart</button>
-        <button class="secondary-button" type="button" data-action="progress">Progress Dashboard</button>
+        <button class="secondary-button" type="button" data-action="progress">Scores & Mistakes</button>
         <button class="ghost-button" type="button" data-action="home">Home</button>
       </div>
     </section>
@@ -837,25 +837,17 @@ function renderProgressDashboard() {
 
   const progress = getProgress();
   const stats = getOverallStats(progress);
-  const historyRows = progress.sessions
-    .slice(-10)
-    .reverse()
-    .map((session) => `
-      <tr>
-        <td>${escapeHtml(session.title)}</td>
-        <td>${session.score}/${session.total}</td>
-        <td>${session.accuracy}%</td>
-        <td>${formatDateTime(session.completedAt)}</td>
-      </tr>
-    `).join("");
+  const mistakes = getMistakeItems(progress);
+  const latestSession = getLatestSession(progress);
+  const todayCompletion = progress.daily.completions[todayKey()];
 
   app.innerHTML = `
     <section>
       <div class="section-head">
         <div>
-          <span class="eyebrow">Progress Dashboard</span>
-          <h1>Learning Analytics</h1>
-          <p>Progress is saved locally in this browser.</p>
+          <span class="eyebrow">Progress</span>
+          <h1>Scores and Wrong Questions</h1>
+          <p>A short view for checking scores and the questions that still need review.</p>
         </div>
         <div class="button-row">
           <button class="danger-button" type="button" data-action="clear-progress">Clear Progress</button>
@@ -863,26 +855,16 @@ function renderProgressDashboard() {
         </div>
       </div>
 
-      <div class="stat-grid dashboard-stats">
-        <div class="stat"><strong>${stats.completed}</strong><span>Questions completed</span></div>
-        <div class="stat"><strong>${stats.accuracy}%</strong><span>Accuracy</span></div>
-        <div class="stat"><strong>${stats.strongest || "-"}</strong><span>Strongest category</span></div>
-        <div class="stat"><strong>${stats.weakest || "-"}</strong><span>Weakest category</span></div>
-        <div class="stat"><strong>${stats.averageTime}s</strong><span>Average solving time</span></div>
+      <div class="stat-grid compact-stats">
+        <div class="stat"><strong>${stats.correct}/${stats.completed || 0}</strong><span>Total score</span></div>
+        <div class="stat"><strong>${latestSession ? `${latestSession.score}/${latestSession.total}` : "-"}</strong><span>Latest score</span></div>
+        <div class="stat"><strong>${todayCompletion ? `${todayCompletion.score}/${todayCompletion.total}` : "Open"}</strong><span>Today's 10 questions</span></div>
+        <div class="stat"><strong>${mistakes.length}</strong><span>Current wrong questions</span></div>
       </div>
 
-      <div class="chart-grid">
-        <article class="chart-card">
-          <h3>Category Accuracy</h3>
-          <canvas id="categoryChart" height="220"></canvas>
-        </article>
-        <article class="chart-card">
-          <h3>Learning History</h3>
-          <canvas id="historyChart" height="220"></canvas>
-        </article>
-      </div>
-      <p class="chart-note" id="chartNote"></p>
-
+      <h2>Current Wrong Questions</h2>
+      ${renderMistakeSummaryTable(mistakes)}
+      <h2>Recent Scores</h2>
       <div class="table-wrap">
         <table>
           <thead>
@@ -893,13 +875,11 @@ function renderProgressDashboard() {
               <th>Completed</th>
             </tr>
           </thead>
-          <tbody>${historyRows || `<tr><td colspan="4">No completed sessions yet.</td></tr>`}</tbody>
+          <tbody>${renderScoreHistoryRows(progress, 6)}</tbody>
         </table>
       </div>
     </section>
   `;
-
-  renderCharts(progress);
 }
 
 function renderAchievements() {
@@ -947,12 +927,13 @@ function renderTeacherDashboard(selectedUsername = "") {
   const selected = selectedUsername || students[0]?.username || "";
   const rows = students.map((student) => teacherStudentRow(student, selected)).join("");
   const totals = students.reduce((summary, student) => {
-    const stats = getOverallStats(getProgress(student.username));
+    const progress = getProgress(student.username);
+    const stats = getOverallStats(progress);
     summary.completed += stats.completed;
     summary.correct += stats.correct;
+    summary.mistakes += getMistakeItems(progress).length;
     return summary;
-  }, { completed: 0, correct: 0 });
-  const classAccuracy = totals.completed ? Math.round((totals.correct / totals.completed) * 100) : 0;
+  }, { completed: 0, correct: 0, mistakes: 0 });
 
   app.innerHTML = `
     <section>
@@ -960,7 +941,7 @@ function renderTeacherDashboard(selectedUsername = "") {
         <div>
           <span class="eyebrow">Teacher Dashboard</span>
           <h1>All Registered Students</h1>
-          <p>Signed in as ${TEACHER_USERNAME}. You can see every registered student's daily work, accuracy, completion, weak modules, submissions, and private feedback.</p>
+          <p>Signed in as ${TEACHER_USERNAME}. This view focuses on each student's score and current wrong questions.</p>
         </div>
         <div class="button-row">
           <button class="secondary-button" type="button" data-action="calendar">Calendar</button>
@@ -970,8 +951,8 @@ function renderTeacherDashboard(selectedUsername = "") {
       </div>
       <div class="stat-grid teacher-stats">
         <div class="stat"><strong>${students.length}</strong><span>Registered students</span></div>
-        <div class="stat"><strong>${totals.completed}</strong><span>Total answers</span></div>
-        <div class="stat"><strong>${classAccuracy}%</strong><span>Class accuracy</span></div>
+        <div class="stat"><strong>${totals.correct}/${totals.completed || 0}</strong><span>Total score</span></div>
+        <div class="stat"><strong>${totals.mistakes}</strong><span>Current wrong questions</span></div>
       </div>
       <div class="teacher-grid">
         <article class="panel">
@@ -991,13 +972,14 @@ function renderTeacherDashboard(selectedUsername = "") {
 function teacherStudentRow(student, selectedUsername) {
   const progress = getProgress(student.username);
   const stats = getOverallStats(progress);
-  const completion = Math.min(100, Math.round((uniqueAnsweredCount(progress) / DATA.questions.length) * 100));
-  const daily = progress.daily.completions[todayKey()] ? "Today done" : "Today open";
+  const mistakes = getMistakeItems(progress);
+  const latestSession = getLatestSession(progress);
+  const daily = progress.daily.completions[todayKey()];
 
   return `
     <button class="student-row ${selectedUsername === student.username ? "active" : ""}" type="button" data-action="view-student" data-username="${escapeHtml(student.username)}">
       <strong>${escapeHtml(student.username)}</strong>
-      <span>${stats.accuracy}% accuracy · ${completion}% completion · ${daily}</span>
+      <span>Total ${stats.correct}/${stats.completed || 0} · Latest ${latestSession ? `${latestSession.score}/${latestSession.total}` : "-"} · Wrong ${mistakes.length} · Today ${daily ? `${daily.score}/${daily.total}` : "open"}</span>
     </button>
   `;
 }
@@ -1005,70 +987,37 @@ function teacherStudentRow(student, selectedUsername) {
 function teacherStudentDetail(username) {
   const progress = getProgress(username);
   const stats = getOverallStats(progress);
-  const completion = Math.min(100, Math.round((uniqueAnsweredCount(progress) / DATA.questions.length) * 100));
-  const categoryRows = DATA.categories.map((category) => {
-    const attempts = progress.attempts.filter((attempt) => attempt.category === category.id);
-    const correct = attempts.filter((attempt) => attempt.correct).length;
-    const accuracy = attempts.length ? Math.round((correct / attempts.length) * 100) : 0;
-    return `
-      <tr>
-        <td>${escapeHtml(category.title)}</td>
-        <td>${attempts.length}</td>
-        <td>${accuracy}%</td>
-        <td>${attempts.filter((attempt) => !attempt.correct).length}</td>
-      </tr>
-    `;
-  }).join("");
+  const mistakes = getMistakeItems(progress);
+  const latestSession = getLatestSession(progress);
   const todayCompletion = progress.daily.completions[todayKey()];
-  const recentAttempts = progress.attempts.slice(-12).reverse().map((attempt) => {
-    const question = getQuestionById(attempt.questionId);
-    return `
-      <tr>
-        <td>${escapeHtml(question?.question || attempt.questionId)}</td>
-        <td>${escapeHtml(attempt.answer || "Shown / blank")}</td>
-        <td>${attempt.correct ? "Correct" : "Needs review"}</td>
-        <td>${formatDateTime(attempt.date)}</td>
-      </tr>
-    `;
-  }).join("");
 
   return `
     <div class="section-head">
       <div>
         <h2>${escapeHtml(username)}</h2>
-        <p>${stats.completed} answers · ${stats.accuracy}% accuracy · weakest: ${escapeHtml(stats.weakest || "No data yet")}</p>
+        <p>Score and wrong-question review only.</p>
       </div>
     </div>
     <div class="stat-grid teacher-stats">
-      <div class="stat"><strong>${completion}%</strong><span>Question bank completion</span></div>
+      <div class="stat"><strong>${stats.correct}/${stats.completed || 0}</strong><span>Total score</span></div>
+      <div class="stat"><strong>${latestSession ? `${latestSession.score}/${latestSession.total}` : "-"}</strong><span>Latest score</span></div>
       <div class="stat"><strong>${todayCompletion ? `${todayCompletion.score}/${todayCompletion.total}` : "Open"}</strong><span>Today's 10 questions</span></div>
-      <div class="stat"><strong>${progress.daily.streak}</strong><span>Daily streak</span></div>
+      <div class="stat"><strong>${mistakes.length}</strong><span>Current wrong questions</span></div>
     </div>
+    <h3>Current Wrong Questions</h3>
+    ${renderMistakeSummaryTable(mistakes)}
+    <h3>Recent Scores</h3>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Module</th>
-            <th>Attempts</th>
+            <th>Session</th>
+            <th>Score</th>
             <th>Accuracy</th>
-            <th>Wrong/review</th>
+            <th>Completed</th>
           </tr>
         </thead>
-        <tbody>${categoryRows}</tbody>
-      </table>
-    </div>
-    <h3>Recent Answers</h3>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Question</th>
-            <th>Student Answer</th>
-            <th>Status</th>
-            <th>Saved</th>
-          </tr>
-        </thead>
-        <tbody>${recentAttempts || `<tr><td colspan="4">No answers yet.</td></tr>`}</tbody>
+        <tbody>${renderScoreHistoryRows(progress, 5)}</tbody>
       </table>
     </div>
   `;
@@ -2148,6 +2097,65 @@ function getOverallStats(progress = getProgress()) {
   return { completed, correct, accuracy, averageTime, strongest, weakest };
 }
 
+function getLatestSession(progress = getProgress()) {
+  return progress.sessions[progress.sessions.length - 1] || null;
+}
+
+function getMistakeItems(progress = getProgress()) {
+  return Object.values(progress.mistakes)
+    .map((mistake) => ({
+      ...mistake,
+      question: getQuestionById(mistake.questionId)
+    }))
+    .filter((mistake) => mistake.question)
+    .sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || ""));
+}
+
+function renderScoreHistoryRows(progress, limit = 6) {
+  const sessions = progress.sessions.slice(-limit).reverse();
+  if (!sessions.length) return `<tr><td colspan="4">No completed sessions yet.</td></tr>`;
+
+  return sessions.map((session) => `
+    <tr>
+      <td>${escapeHtml(session.title)}</td>
+      <td>${session.score}/${session.total}</td>
+      <td>${session.accuracy}%</td>
+      <td>${formatDateTime(session.completedAt)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderMistakeSummaryTable(mistakes, limit = 10) {
+  const visibleMistakes = mistakes.slice(0, limit);
+  const rows = visibleMistakes.map((mistake) => `
+    <tr>
+      <td>${escapeHtml(categoryTitle(mistake.question.category))}</td>
+      <td>${escapeHtml(mistake.question.question)}</td>
+      <td>${escapeHtml(mistake.lastAnswer || "Shown / blank")}</td>
+      <td>${formatAnswer(mistake.question.answer)}</td>
+      <td>${formatDateTime(mistake.savedAt)}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <div class="table-wrap compact-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th>Wrong Question</th>
+            <th>Student Answer</th>
+            <th>Correct Answer</th>
+            <th>Last Wrong</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="5">No current wrong questions.</td></tr>`}</tbody>
+      </table>
+    </div>
+    ${mistakes.length > limit ? `<p class="muted-note">Showing the latest ${limit} of ${mistakes.length} current wrong questions.</p>` : ""}
+  `;
+}
+
 function uniqueAnsweredCount(progress) {
   return new Set(progress.attempts.map((attempt) => attempt.questionId)).size;
 }
@@ -2160,18 +2168,22 @@ function exportTeacherReport() {
 
   const students = getUsers().filter((user) => user.role !== "teacher");
   const lines = [
-    ["Student", "Answers", "Accuracy", "Daily Streak", "Weakest Category"].join(",")
+    ["Student", "Total Score", "Latest Score", "Today", "Current Wrong Questions", "Wrong Question IDs"].join(",")
   ];
 
   students.forEach((student) => {
     const progress = getProgress(student.username);
     const stats = getOverallStats(progress);
+    const latestSession = getLatestSession(progress);
+    const todayCompletion = progress.daily.completions[todayKey()];
+    const mistakes = getMistakeItems(progress);
     lines.push([
       student.username,
-      stats.completed,
-      `${stats.accuracy}%`,
-      progress.daily.streak,
-      stats.weakest || "No data"
+      `${stats.correct}/${stats.completed || 0}`,
+      latestSession ? `${latestSession.score}/${latestSession.total}` : "No score",
+      todayCompletion ? `${todayCompletion.score}/${todayCompletion.total}` : "Open",
+      mistakes.length,
+      mistakes.map((mistake) => mistake.questionId).join(" | ") || "None"
     ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","));
   });
 

@@ -301,6 +301,10 @@ html.dark .badge-card {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.compact-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .stat {
   min-width: 0;
   padding: 16px;
@@ -934,6 +938,10 @@ html.dark .badge-card {
   overflow-x: auto;
 }
 
+.compact-table {
+  margin: 8px 0 18px;
+}
+
 table {
   width: 100%;
   min-width: 640px;
@@ -945,12 +953,18 @@ td {
   padding: 12px;
   border-bottom: 1px solid var(--line);
   text-align: left;
+  vertical-align: top;
 }
 
 th {
   color: var(--muted);
   font-size: 0.82rem;
   text-transform: uppercase;
+}
+
+.compact-table td:nth-child(2) {
+  min-width: 260px;
+  line-height: 1.45;
 }
 
 .empty {
@@ -1042,6 +1056,7 @@ th {
   }
 
   .dashboard-stats,
+  .compact-stats,
   .badge-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
