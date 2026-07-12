@@ -2,18 +2,40 @@
 // The app is intentionally framework-free so it can run by opening index.html.
 
 const DATA = window.NumberSenseAcademyData;
-const STORAGE_KEY = "numberSenseAcademy.progress.v1";
+const TEACHER_USERNAME = "Elven Zeng";
+const TEACHER_PASSWORD = "Elven2026!";
+const USERS_KEY = "numberSenseAcademy.users.v1";
+const SESSION_KEY = "numberSenseAcademy.currentUser.v1";
+const PROGRESS_BY_USER_KEY = "numberSenseAcademy.progressByUser.v1";
+const LEGACY_PROGRESS_KEY = "numberSenseAcademy.progress.v1";
+const ASSIGNMENTS_KEY = "numberSenseAcademy.assignments.v1";
 const THEME_KEY = "numberSenseAcademy.theme.v1";
+const FILE_DB_NAME = "numberSenseAcademy.files.v1";
+const FILE_STORE_NAME = "files";
 const DAILY_COUNT = 10;
 const SPEED_SECONDS = 60;
+const HOMEWORK_STATUSES = [
+  "Not submitted",
+  "Submitted",
+  "Late",
+  "Needs revision",
+  "Reviewed",
+  "Complete",
+  "Missing"
+];
 
 const app = document.querySelector("#app");
 const themeLabel = document.querySelector("[data-theme-label]");
+const logoutButton = document.querySelector("[data-action='logout']");
 
+let currentUser = null;
+let authMode = "login";
 let practiceSession = null;
 let practiceTimerId = null;
 let speedTimerId = null;
 let chartInstances = [];
+let calendarMonth = new Date();
+let selectedCalendarDate = todayKey();
 
 document.addEventListener("click", handleClick);
 document.addEventListener("submit", handleSubmit);
@@ -21,8 +43,51 @@ document.addEventListener("submit", handleSubmit);
 initialize();
 
 function initialize() {
+  seedTeacherAccount();
   applyTheme(localStorage.getItem(THEME_KEY) || "light");
-  renderHome();
+  currentUser = getCurrentUser();
+  updateAuthButtons();
+  if (currentUser) renderHome();
+  else renderAuth();
+}
+
+function renderAuth(message = "") {
+  stopTimers();
+  destroyCharts();
+
+  app.innerHTML = `
+    <section class="hero-panel auth-layout">
+      <div>
+        <span class="eyebrow">Number Sense Academy</span>
+        <h1>Practice starts after sign in</h1>
+        <p>Students get a daily 10-question set from the number sense modules. The teacher account can assign work, review submissions, record class time, and see all registered student progress.</p>
+        <div class="stat-grid">
+          <div class="stat"><strong>10</strong><span>Daily questions</span></div>
+          <div class="stat"><strong>8</strong><span>Core modules</span></div>
+          <div class="stat"><strong>80</strong><span>Question bank</span></div>
+        </div>
+      </div>
+      <article class="panel auth-card">
+        <div class="auth-tabs">
+          <button class="tab-button ${authMode === "login" ? "active" : ""}" type="button" data-action="auth-mode" data-mode="login">Log in</button>
+          <button class="tab-button ${authMode === "register" ? "active" : ""}" type="button" data-action="auth-mode" data-mode="register">Register</button>
+        </div>
+        <form class="form" data-form="auth">
+          <div class="field">
+            <label>Username</label>
+            <input name="username" autocomplete="username" placeholder="${authMode === "login" ? "Username" : "Create a username"}" required>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input name="password" type="password" autocomplete="${authMode === "login" ? "current-password" : "new-password"}" placeholder="Password" required>
+          </div>
+          ${message ? `<div class="message">${escapeHtml(message)}</div>` : ""}
+          <button class="primary-button" type="submit">${authMode === "login" ? "Log in" : "Create student account"}</button>
+          <p class="muted-note">Teacher login: ${TEACHER_USERNAME}</p>
+        </form>
+      </article>
+    </section>
+  `;
 }
 
 function handleClick(event) {
@@ -31,8 +96,27 @@ function handleClick(event) {
 
   const action = target.dataset.action;
 
-  if (action === "home") renderHome();
   if (action === "toggle-theme") toggleTheme();
+  if (action === "auth-mode") {
+    authMode = target.dataset.mode;
+    renderAuth();
+    return;
+  }
+  if (action === "logout") {
+    stopTimers();
+    currentUser = null;
+    localStorage.removeItem(SESSION_KEY);
+    updateAuthButtons();
+    renderAuth();
+    return;
+  }
+
+  if (!currentUser) {
+    renderAuth();
+    return;
+  }
+
+  if (action === "home") renderHome();
   if (action === "start-category") startCategory(target.dataset.category);
   if (action === "start-random") startRandomPractice();
   if (action === "start-daily") startDailyChallenge();
@@ -50,13 +134,40 @@ function handleClick(event) {
   if (action === "progress") renderProgressDashboard();
   if (action === "achievements") renderAchievements();
   if (action === "teacher") renderTeacherDashboard();
+  if (action === "view-student") renderTeacherDashboard(target.dataset.username);
+  if (action === "calendar") renderCalendarView();
+  if (action === "calendar-prev") {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    selectedCalendarDate = toDateKey(calendarMonth);
+    renderCalendarView(selectedCalendarDate);
+  }
+  if (action === "calendar-next") {
+    calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+    selectedCalendarDate = toDateKey(calendarMonth);
+    renderCalendarView(selectedCalendarDate);
+  }
+  if (action === "select-date") {
+    selectedCalendarDate = target.dataset.date;
+    calendarMonth = parseDateKey(selectedCalendarDate);
+    renderCalendarView(selectedCalendarDate);
+  }
+  if (action === "download-file") downloadStoredFile(target.dataset.fileId);
+  if (action === "delete-assignment") deleteAssignment(target.dataset.assignmentId);
+  if (action === "delete-lesson") deleteLesson(target.dataset.lessonId);
   if (action === "ai") renderAiGenerator();
   if (action === "clear-progress") clearProgress();
-  if (action === "export-report") showToast("Export report is a mock UI action in this static version.");
+  if (action === "export-report") exportTeacherReport();
 }
 
 function handleSubmit(event) {
   event.preventDefault();
+
+  if (event.target.dataset.form === "auth") {
+    if (authMode === "login") login(event.target);
+    else register(event.target);
+  }
+
+  if (!currentUser) return;
 
   if (event.target.dataset.form === "answer") {
     submitCurrentAnswer();
@@ -64,6 +175,22 @@ function handleSubmit(event) {
 
   if (event.target.dataset.form === "speed") {
     submitSpeedAnswer();
+  }
+
+  if (event.target.dataset.form === "assignment") {
+    saveAssignment(event.target);
+  }
+
+  if (event.target.dataset.form === "submission") {
+    saveSubmission(event.target);
+  }
+
+  if (event.target.dataset.form === "review") {
+    saveReview(event.target);
+  }
+
+  if (event.target.dataset.form === "lesson") {
+    saveLesson(event.target);
   }
 }
 
@@ -73,18 +200,27 @@ function renderHome() {
 
   const progress = getProgress();
   const stats = getOverallStats(progress);
+  const isTeacher = currentUser.role === "teacher";
+  const modules = DATA.modules.filter((module) => isTeacher || module.type !== "teacher");
+  const today = todayKey();
+  const dailyDone = Boolean(progress.daily.completions[today]);
 
   app.innerHTML = `
     <section class="hero-panel">
       <div>
-        <span class="eyebrow">Interactive number sense practice</span>
-        <h1>Number Sense Academy</h1>
-        <p>Practice, games, progress tracking, mistake review, and achievement badges for Grades 6-9 learners.</p>
+        <span class="eyebrow">${isTeacher ? "Teacher access active" : "Student practice dashboard"}</span>
+        <h1>Welcome, ${escapeHtml(currentUser.username)}</h1>
+        <p>${isTeacher ? "Manage assignments, class time, student submissions, and all registered student progress." : "Complete today's 10-question number sense set, then continue with games and targeted modules."}</p>
+        <div class="button-row">
+          ${isTeacher ? `<button class="primary-button" type="button" data-action="teacher">Teacher Dashboard</button>` : `<button class="primary-button" type="button" data-action="start-daily">${dailyDone ? "Practice Today's Set Again" : "Start Today's 10 Questions"}</button>`}
+          <button class="secondary-button" type="button" data-action="calendar">Calendar</button>
+          <button class="ghost-button" type="button" data-action="progress">Progress</button>
+        </div>
       </div>
       <div class="hero-stats" aria-label="Progress summary">
         <div class="stat"><strong>${stats.completed}</strong><span>Questions completed</span></div>
         <div class="stat"><strong>${stats.accuracy}%</strong><span>Accuracy</span></div>
-        <div class="stat"><strong>${progress.daily.streak}</strong><span>Daily streak</span></div>
+        <div class="stat"><strong>${dailyDone ? "Done" : "Open"}</strong><span>Today's 10 questions</span></div>
       </div>
     </section>
 
@@ -96,7 +232,7 @@ function renderHome() {
         </div>
       </div>
       <div class="module-grid">
-        ${DATA.modules.map((module) => moduleCard(module, progress)).join("")}
+        ${modules.map((module) => moduleCard(module, progress)).join("")}
       </div>
     </section>
   `;
@@ -445,7 +581,7 @@ function renderDailyChallenge(message = "") {
     <section class="panel intro-panel">
       <span class="eyebrow">Daily Challenge</span>
       <h1>Today's 10 Questions</h1>
-      <p>Daily questions are generated from today's date, so the set stays stable all day and refreshes tomorrow.</p>
+      <p>Every day has exactly 10 questions: one from each of the 8 number sense modules, plus 2 extra rotating module questions. The set stays fixed for the day and refreshes tomorrow.</p>
       <div class="stat-grid">
         <div class="stat"><strong>${progress.daily.streak}</strong><span>Daily streak</span></div>
         <div class="stat"><strong>${completion ? `${completion.score}/${completion.total}` : "Open"}</strong><span>Today status</span></div>
@@ -797,62 +933,944 @@ function renderAchievements() {
   `;
 }
 
-function renderTeacherDashboard() {
+function renderTeacherDashboard(selectedUsername = "") {
+  if (currentUser.role !== "teacher") {
+    showToast("Only Elven Zeng has teacher dashboard access.");
+    renderHome();
+    return;
+  }
+
   stopTimers();
   destroyCharts();
 
-  const progress = getProgress();
-  const stats = getOverallStats(progress);
-  const mockRows = mockTeacherRows(progress, stats).map((student) => `
-    <tr>
-      <td>${escapeHtml(student.name)}</td>
-      <td>${student.accuracy}%</td>
-      <td>${student.completion}%</td>
-      <td>${escapeHtml(student.weakCategories)}</td>
-    </tr>
-  `).join("");
+  const students = getUsers().filter((user) => user.role !== "teacher");
+  const selected = selectedUsername || students[0]?.username || "";
+  const rows = students.map((student) => teacherStudentRow(student, selected)).join("");
+  const totals = students.reduce((summary, student) => {
+    const stats = getOverallStats(getProgress(student.username));
+    summary.completed += stats.completed;
+    summary.correct += stats.correct;
+    return summary;
+  }, { completed: 0, correct: 0 });
+  const classAccuracy = totals.completed ? Math.round((totals.correct / totals.completed) * 100) : 0;
 
   app.innerHTML = `
     <section>
       <div class="section-head">
         <div>
-          <span class="eyebrow">Mock Teacher Dashboard</span>
-          <h1>Class Overview</h1>
-          <p>This static mock shows how teacher reporting can look without a backend database.</p>
+          <span class="eyebrow">Teacher Dashboard</span>
+          <h1>All Registered Students</h1>
+          <p>Signed in as ${TEACHER_USERNAME}. You can see every registered student's daily work, accuracy, completion, weak modules, submissions, and private feedback.</p>
         </div>
         <div class="button-row">
+          <button class="secondary-button" type="button" data-action="calendar">Calendar</button>
           <button class="primary-button" type="button" data-action="export-report">Export Report</button>
           <button class="ghost-button" type="button" data-action="home">Home</button>
         </div>
       </div>
+      <div class="stat-grid teacher-stats">
+        <div class="stat"><strong>${students.length}</strong><span>Registered students</span></div>
+        <div class="stat"><strong>${totals.completed}</strong><span>Total answers</span></div>
+        <div class="stat"><strong>${classAccuracy}%</strong><span>Class accuracy</span></div>
+      </div>
       <div class="teacher-grid">
         <article class="panel">
-          <h2>Summary</h2>
-          <div class="stat-grid teacher-stats">
-            <div class="stat"><strong>4</strong><span>Students</span></div>
-            <div class="stat"><strong>${stats.accuracy}%</strong><span>Your accuracy</span></div>
-            <div class="stat"><strong>${stats.completed}</strong><span>Your completed questions</span></div>
+          <h2>Student List</h2>
+          <div class="student-list">
+            ${students.length ? rows : `<div class="empty">No student accounts yet.</div>`}
           </div>
         </article>
         <article class="panel">
-          <h2>Student List</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Accuracy</th>
-                  <th>Completion</th>
-                  <th>Weak Categories</th>
-                </tr>
-              </thead>
-              <tbody>${mockRows}</tbody>
-            </table>
-          </div>
+          ${selected ? teacherStudentDetail(selected) : `<div class="empty">Select a student to view practice progress.</div>`}
         </article>
       </div>
     </section>
   `;
+}
+
+function teacherStudentRow(student, selectedUsername) {
+  const progress = getProgress(student.username);
+  const stats = getOverallStats(progress);
+  const completion = Math.min(100, Math.round((uniqueAnsweredCount(progress) / DATA.questions.length) * 100));
+  const daily = progress.daily.completions[todayKey()] ? "Today done" : "Today open";
+
+  return `
+    <button class="student-row ${selectedUsername === student.username ? "active" : ""}" type="button" data-action="view-student" data-username="${escapeHtml(student.username)}">
+      <strong>${escapeHtml(student.username)}</strong>
+      <span>${stats.accuracy}% accuracy · ${completion}% completion · ${daily}</span>
+    </button>
+  `;
+}
+
+function teacherStudentDetail(username) {
+  const progress = getProgress(username);
+  const stats = getOverallStats(progress);
+  const completion = Math.min(100, Math.round((uniqueAnsweredCount(progress) / DATA.questions.length) * 100));
+  const categoryRows = DATA.categories.map((category) => {
+    const attempts = progress.attempts.filter((attempt) => attempt.category === category.id);
+    const correct = attempts.filter((attempt) => attempt.correct).length;
+    const accuracy = attempts.length ? Math.round((correct / attempts.length) * 100) : 0;
+    return `
+      <tr>
+        <td>${escapeHtml(category.title)}</td>
+        <td>${attempts.length}</td>
+        <td>${accuracy}%</td>
+        <td>${attempts.filter((attempt) => !attempt.correct).length}</td>
+      </tr>
+    `;
+  }).join("");
+  const todayCompletion = progress.daily.completions[todayKey()];
+  const recentAttempts = progress.attempts.slice(-12).reverse().map((attempt) => {
+    const question = getQuestionById(attempt.questionId);
+    return `
+      <tr>
+        <td>${escapeHtml(question?.question || attempt.questionId)}</td>
+        <td>${escapeHtml(attempt.answer || "Shown / blank")}</td>
+        <td>${attempt.correct ? "Correct" : "Needs review"}</td>
+        <td>${formatDateTime(attempt.date)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <div class="section-head">
+      <div>
+        <h2>${escapeHtml(username)}</h2>
+        <p>${stats.completed} answers · ${stats.accuracy}% accuracy · weakest: ${escapeHtml(stats.weakest || "No data yet")}</p>
+      </div>
+    </div>
+    <div class="stat-grid teacher-stats">
+      <div class="stat"><strong>${completion}%</strong><span>Question bank completion</span></div>
+      <div class="stat"><strong>${todayCompletion ? `${todayCompletion.score}/${todayCompletion.total}` : "Open"}</strong><span>Today's 10 questions</span></div>
+      <div class="stat"><strong>${progress.daily.streak}</strong><span>Daily streak</span></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th>Attempts</th>
+            <th>Accuracy</th>
+            <th>Wrong/review</th>
+          </tr>
+        </thead>
+        <tbody>${categoryRows}</tbody>
+      </table>
+    </div>
+    <h3>Recent Answers</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Student Answer</th>
+            <th>Status</th>
+            <th>Saved</th>
+          </tr>
+        </thead>
+        <tbody>${recentAttempts || `<tr><td colspan="4">No answers yet.</td></tr>`}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
+  stopTimers();
+  destroyCharts();
+
+  selectedCalendarDate = dateKey || todayKey();
+  calendarMonth = parseDateKey(selectedCalendarDate);
+
+  const data = getAssignmentData();
+  const isTeacher = currentUser.role === "teacher";
+  const resources = data.assignments
+    .filter((assignment) => assignment.date === selectedCalendarDate)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const notes = resources.filter((assignment) => assignment.type === "note");
+  const homework = resources.filter((assignment) => assignment.type === "homework");
+  const lessons = getLessonsForDate(data, selectedCalendarDate, currentUser.username, isTeacher);
+
+  app.innerHTML = `
+    <section>
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">${isTeacher ? "Teacher calendar" : "Student calendar"}</span>
+          <h1>Calendar</h1>
+          <p>${isTeacher ? "Upload notes, assign homework, review student submissions, and record class time." : "Download notes/homework, see class time, and upload homework by date."}</p>
+        </div>
+        <div class="button-row">
+          ${isTeacher ? `<button class="secondary-button" type="button" data-action="teacher">Teacher Dashboard</button>` : ""}
+          <button class="ghost-button" type="button" data-action="home">Home</button>
+        </div>
+      </div>
+      <div class="calendar-layout">
+        <section class="panel calendar-panel">
+          <div class="calendar-toolbar">
+            <button class="ghost-button" type="button" data-action="calendar-prev">Prev</button>
+            <h2>${monthTitle(calendarMonth)}</h2>
+            <button class="ghost-button" type="button" data-action="calendar-next">Next</button>
+          </div>
+          <div class="calendar-grid" aria-label="Assignment calendar">
+            ${calendarWeekdays().map((day) => `<span class="calendar-weekday">${day}</span>`).join("")}
+            ${calendarCells(calendarMonth, data).join("")}
+          </div>
+        </section>
+        <section class="panel date-panel">
+          <div class="section-head compact-head">
+            <div>
+              <h2>${formatDateForDisplay(selectedCalendarDate)}</h2>
+              <p>${notes.length} notes · ${homework.length} homework · ${lessons.length} class time</p>
+            </div>
+          </div>
+          ${message ? `<div class="message ${calendarMessageClass(message)}">${escapeHtml(message)}</div>` : ""}
+          ${isTeacher ? teacherCalendarTools(resources, lessons, data) : studentCalendarTools(resources, lessons, data)}
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function teacherCalendarTools(resources, lessons, data) {
+  const notes = resources.filter((assignment) => assignment.type === "note");
+  const homework = resources.filter((assignment) => assignment.type === "homework");
+
+  return `
+    <div class="resource-columns teacher-action-grid">
+      <section class="resource-section">
+        <h3>Upload Notes</h3>
+        ${resourceUploadForm("note")}
+      </section>
+      <section class="resource-section">
+        <h3>Upload Homework</h3>
+        ${resourceUploadForm("homework")}
+      </section>
+      <section class="resource-section">
+        <h3>Add Class Time</h3>
+        ${lessonRecordForm()}
+      </section>
+    </div>
+    <div class="resource-columns">
+      <section class="resource-strip">
+        <h3>Notes for This Date</h3>
+        <div class="assignment-stack">${notes.length ? notes.map(teacherNoteCard).join("") : `<div class="empty">No notes uploaded.</div>`}</div>
+      </section>
+      <section class="resource-strip">
+        <h3>Homework for This Date</h3>
+        <div class="assignment-stack">${homework.length ? homework.map((assignment) => teacherHomeworkCard(assignment, data)).join("") : `<div class="empty">No homework uploaded.</div>`}</div>
+      </section>
+    </div>
+    <section class="resource-strip">
+      <h3>Class Time</h3>
+      <div class="assignment-stack">${lessons.length ? lessons.map(teacherLessonCard).join("") : `<div class="empty">No class time recorded.</div>`}</div>
+    </section>
+    <section class="resource-strip">
+      <h3>My Uploaded Resources</h3>
+      ${teacherCoursewareList(data)}
+    </section>
+  `;
+}
+
+function studentCalendarTools(resources, lessons, data) {
+  const notes = resources.filter((assignment) => assignment.type === "note");
+  const homework = resources.filter((assignment) => assignment.type === "homework");
+
+  return `
+    <section class="resource-strip student-category">
+      <h3>Download Notes</h3>
+      ${notes.length ? notes.map(studentResourceCard).join("") : `<div class="empty">No notes for this date.</div>`}
+    </section>
+    <section class="resource-strip student-category">
+      <h3>Download Homework</h3>
+      ${homework.length ? homework.map(studentResourceCard).join("") : `<div class="empty">No homework files for this date.</div>`}
+    </section>
+    <section class="resource-strip student-category">
+      <h3>Class Time</h3>
+      ${lessons.length ? lessons.map(studentLessonCard).join("") : `<div class="empty">No class time recorded for this date.</div>`}
+    </section>
+    <section class="resource-strip student-category">
+      <h3>Upload Homework</h3>
+      ${homework.length ? homework.map((assignment) => studentAssignmentCard(assignment, data)).join("") : `<div class="empty">No homework to submit.</div>`}
+    </section>
+  `;
+}
+
+function resourceUploadForm(kind) {
+  const isNote = kind === "note";
+  return `
+    <form class="form assignment-form" data-form="assignment">
+      <input type="hidden" name="assignmentDate" value="${selectedCalendarDate}">
+      <input type="hidden" name="assignmentKind" value="${kind}">
+      <div class="field">
+        <label>${isNote ? "Note title" : "Homework title"}</label>
+        <input name="assignmentTitle" required>
+      </div>
+      <div class="field">
+        <label>${isNote ? "Note description" : "Homework instructions"}</label>
+        <input name="assignmentInstructions" required>
+      </div>
+      <div class="field">
+        <label>${isNote ? "Upload note files" : "Upload homework files"}</label>
+        <input name="assignmentFiles" type="file" multiple>
+      </div>
+      <button class="${isNote ? "secondary-button" : "primary-button"}" type="submit">${isNote ? "Upload Notes" : "Upload Homework"}</button>
+    </form>
+  `;
+}
+
+function lessonRecordForm() {
+  const studentOptions = getUsers()
+    .filter((user) => user.role !== "teacher")
+    .map((student) => `<option value="${escapeHtml(student.username)}">${escapeHtml(student.username)}</option>`)
+    .join("");
+
+  return `
+    <form class="form lesson-form" data-form="lesson">
+      <input type="hidden" name="lessonDate" value="${selectedCalendarDate}">
+      <div class="field">
+        <label>Class topic</label>
+        <input name="lessonTitle" required>
+      </div>
+      <div class="field">
+        <label>Visible to</label>
+        <select name="lessonStudent">
+          <option value="all">All students</option>
+          ${studentOptions}
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Start time</label>
+          <input name="lessonStart" type="time" required>
+        </div>
+        <div class="field">
+          <label>Duration (hours)</label>
+          <input name="lessonDuration" type="number" min="0.25" step="0.25" value="1" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Teacher note</label>
+        <input name="lessonNotes">
+      </div>
+      <button class="primary-button" type="submit">Save Class Time</button>
+    </form>
+  `;
+}
+
+function teacherNoteCard(note) {
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill">Note</span>
+          <h3>${escapeHtml(note.title)}</h3>
+          <p>${escapeHtml(note.instructions)}</p>
+        </div>
+        <button class="danger-button" type="button" data-action="delete-assignment" data-assignment-id="${note.id}">Delete</button>
+      </div>
+      ${renderFileList(note.files)}
+    </article>
+  `;
+}
+
+function teacherHomeworkCard(assignment, data) {
+  const students = getUsers().filter((user) => user.role !== "teacher");
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill">Homework</span>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p>${escapeHtml(assignment.instructions)}</p>
+        </div>
+        <button class="danger-button" type="button" data-action="delete-assignment" data-assignment-id="${assignment.id}">Delete</button>
+      </div>
+      ${renderFileList(assignment.files)}
+      <div class="submission-list">
+        <h4>Student Review</h4>
+        ${students.length ? students.map((student) => teacherStudentReviewCard(assignment, student.username, data)).join("") : `<div class="empty">No student accounts yet.</div>`}
+      </div>
+    </article>
+  `;
+}
+
+function teacherStudentReviewCard(assignment, student, data) {
+  const submission = getStudentSubmission(data, assignment.id, student);
+  const review = getStudentReview(data, assignment.id, student);
+  const status = review?.status || (submission ? "Submitted" : "Not submitted");
+  return `
+    <article class="submission-card">
+      <div class="submission-head">
+        <div>
+          <strong>${escapeHtml(student)}</strong>
+          <span>${submission ? `Submitted ${formatDateTime(submission.submittedAt)}` : "No submission yet"}</span>
+        </div>
+        <span class="pill status-pill ${statusClass(status)}">${escapeHtml(status)}</span>
+      </div>
+      ${submission?.note ? `<p>${escapeHtml(submission.note)}</p>` : ""}
+      ${submission ? renderFileList(submission.files) : `<div class="file-list empty">No submitted files.</div>`}
+      <form class="form feedback-form" data-form="review">
+        <input type="hidden" name="assignmentId" value="${assignment.id}">
+        <input type="hidden" name="student" value="${escapeHtml(student)}">
+        <div class="field">
+          <label>Submission status</label>
+          <select name="status">${HOMEWORK_STATUSES.map((item) => `<option value="${item}" ${item === status ? "selected" : ""}>${item}</option>`).join("")}</select>
+        </div>
+        <div class="field">
+          <label>Private 1:1 comment</label>
+          <input name="comment" value="${escapeHtml(review?.comment || "")}" placeholder="Only teacher and this student should see it">
+        </div>
+        <button class="secondary-button" type="submit">Save Status and Comment</button>
+      </form>
+    </article>
+  `;
+}
+
+function studentResourceCard(assignment) {
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill">${assignment.type === "note" ? "Note" : "Homework"}</span>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p>${escapeHtml(assignment.instructions)}</p>
+        </div>
+      </div>
+      ${renderFileList(assignment.files)}
+    </article>
+  `;
+}
+
+function studentAssignmentCard(assignment, data) {
+  const submission = getStudentSubmission(data, assignment.id, currentUser.username);
+  const review = getStudentReview(data, assignment.id, currentUser.username);
+  const status = review?.status || (submission ? "Submitted" : "Not submitted");
+  return `
+    <article class="assignment-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill status-pill ${statusClass(status)}">${escapeHtml(status)}</span>
+          <h3>${escapeHtml(assignment.title)}</h3>
+          <p>${escapeHtml(assignment.instructions)}</p>
+        </div>
+      </div>
+      ${submission ? `<div class="submission-card"><strong>Your submission</strong><span>${formatDateTime(submission.submittedAt)}</span>${renderFileList(submission.files)}</div>` : ""}
+      ${review?.comment ? `<div class="feedback show correct"><strong>Private teacher comment</strong>${escapeHtml(review.comment)}</div>` : `<div class="feedback show">No private teacher comment yet.</div>`}
+      <form class="form submission-form" data-form="submission">
+        <input type="hidden" name="assignmentId" value="${assignment.id}">
+        <div class="field">
+          <label>Submission note</label>
+          <input name="submissionNote" value="${submission ? escapeHtml(submission.note || "") : ""}">
+        </div>
+        <div class="field">
+          <label>Upload homework files</label>
+          <input name="submissionFiles" type="file" multiple>
+        </div>
+        <button class="primary-button" type="submit">${submission ? "Resubmit Homework" : "Submit Homework"}</button>
+      </form>
+    </article>
+  `;
+}
+
+function teacherLessonCard(lesson) {
+  return `
+    <article class="assignment-card lesson-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill lesson-pill">Class Time</span>
+          <h3>${escapeHtml(lesson.title)}</h3>
+          ${lesson.notes ? `<p>${escapeHtml(lesson.notes)}</p>` : ""}
+        </div>
+        <button class="danger-button" type="button" data-action="delete-lesson" data-lesson-id="${lesson.id}">Delete</button>
+      </div>
+      ${lessonMeta(lesson, true)}
+    </article>
+  `;
+}
+
+function studentLessonCard(lesson) {
+  return `
+    <article class="assignment-card lesson-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill lesson-pill">Class Time</span>
+          <h3>${escapeHtml(lesson.title)}</h3>
+          ${lesson.notes ? `<p>${escapeHtml(lesson.notes)}</p>` : ""}
+        </div>
+      </div>
+      ${lessonMeta(lesson, false)}
+    </article>
+  `;
+}
+
+function lessonMeta(lesson, showStudent) {
+  return `
+    <div class="lesson-meta">
+      <span><strong>Date</strong>${formatDateForDisplay(lesson.date)}</span>
+      <span><strong>Start</strong>${escapeHtml(formatClockTime(lesson.startTime))}</span>
+      <span><strong>Duration</strong>${formatLessonHours(lesson.durationHours)}</span>
+      ${showStudent ? `<span><strong>Visible to</strong>${escapeHtml(lesson.student === "all" ? "All students" : lesson.student)}</span>` : ""}
+    </div>
+  `;
+}
+
+function getAssignmentData() {
+  const data = safeJson(localStorage.getItem(ASSIGNMENTS_KEY), null);
+  return {
+    assignments: Array.isArray(data?.assignments) ? data.assignments : [],
+    submissions: Array.isArray(data?.submissions) ? data.submissions : [],
+    reviews: Array.isArray(data?.reviews) ? data.reviews : [],
+    lessons: Array.isArray(data?.lessons) ? data.lessons : []
+  };
+}
+
+function saveAssignmentData(data) {
+  localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify({
+    assignments: data.assignments || [],
+    submissions: data.submissions || [],
+    reviews: data.reviews || [],
+    lessons: data.lessons || []
+  }));
+}
+
+async function saveAssignment(form) {
+  if (currentUser.role !== "teacher") return;
+
+  const date = form.elements.assignmentDate.value;
+  const kind = form.elements.assignmentKind.value === "note" ? "note" : "homework";
+  const title = form.elements.assignmentTitle.value.trim();
+  const instructions = form.elements.assignmentInstructions.value.trim();
+  const files = Array.from(form.elements.assignmentFiles.files || []);
+
+  if (!date || !title || !instructions) {
+    renderCalendarView(date || selectedCalendarDate, "Please add a title and instructions.");
+    return;
+  }
+
+  try {
+    const assignmentId = createId("assignment");
+    const fileRecords = await storeFiles(files, { kind, owner: currentUser.username, assignmentId });
+    const data = getAssignmentData();
+    const now = new Date().toISOString();
+    data.assignments.push({
+      id: assignmentId,
+      type: kind,
+      date,
+      title,
+      instructions,
+      teacher: currentUser.username,
+      files: fileRecords,
+      createdAt: now,
+      updatedAt: now
+    });
+    saveAssignmentData(data);
+    renderCalendarView(date, `${kind === "note" ? "Notes" : "Homework"} uploaded.`);
+  } catch (error) {
+    renderCalendarView(date, `Upload failed: ${error.message}`);
+  }
+}
+
+async function saveSubmission(form) {
+  if (currentUser.role !== "student") return;
+
+  const assignmentId = form.elements.assignmentId.value;
+  const note = form.elements.submissionNote.value.trim();
+  const files = Array.from(form.elements.submissionFiles.files || []);
+  const data = getAssignmentData();
+  const assignment = data.assignments.find((item) => item.id === assignmentId);
+  const existing = data.submissions.find((item) => item.assignmentId === assignmentId && item.student === currentUser.username);
+
+  if (!assignment) {
+    renderCalendarView(selectedCalendarDate, "This homework no longer exists.");
+    return;
+  }
+
+  if (!files.length && !note && !existing) {
+    renderCalendarView(assignment.date, "Add a file or note before submitting.");
+    return;
+  }
+
+  try {
+    const fileRecords = files.length
+      ? await storeFiles(files, { kind: "submission", owner: currentUser.username, assignmentId })
+      : existing?.files || [];
+    const now = new Date().toISOString();
+
+    if (existing) {
+      existing.note = note;
+      existing.files = fileRecords;
+      existing.submittedAt = now;
+    } else {
+      data.submissions.push({
+        id: createId("submission"),
+        assignmentId,
+        student: currentUser.username,
+        note,
+        files: fileRecords,
+        submittedAt: now
+      });
+    }
+
+    saveAssignmentData(data);
+    renderCalendarView(assignment.date, "Homework submitted.");
+  } catch (error) {
+    renderCalendarView(assignment.date, `Submission failed: ${error.message}`);
+  }
+}
+
+function saveReview(form) {
+  if (currentUser.role !== "teacher") return;
+
+  const assignmentId = form.elements.assignmentId.value;
+  const student = form.elements.student.value;
+  const status = form.elements.status.value;
+  const comment = form.elements.comment.value.trim();
+  const data = getAssignmentData();
+  const assignment = data.assignments.find((item) => item.id === assignmentId);
+
+  if (!assignment) {
+    renderCalendarView(selectedCalendarDate, "Homework not found.");
+    return;
+  }
+
+  data.reviews = data.reviews || [];
+  const existing = data.reviews.find((item) => item.assignmentId === assignmentId && item.student === student);
+  const now = new Date().toISOString();
+
+  if (existing) {
+    existing.status = status;
+    existing.comment = comment;
+    existing.updatedAt = now;
+  } else {
+    data.reviews.push({
+      id: createId("review"),
+      assignmentId,
+      student,
+      status,
+      comment,
+      updatedAt: now,
+      updatedBy: currentUser.username
+    });
+  }
+
+  saveAssignmentData(data);
+  renderCalendarView(assignment.date, "Private status and comment saved.");
+}
+
+function saveLesson(form) {
+  if (currentUser.role !== "teacher") return;
+
+  const date = form.elements.lessonDate.value;
+  const title = form.elements.lessonTitle.value.trim();
+  const student = form.elements.lessonStudent.value || "all";
+  const startTime = form.elements.lessonStart.value;
+  const durationHours = Number(form.elements.lessonDuration.value);
+  const notes = form.elements.lessonNotes.value.trim();
+
+  if (!date || !title || !startTime || !Number.isFinite(durationHours) || durationHours <= 0) {
+    renderCalendarView(date || selectedCalendarDate, "Please add a class topic, start time, and valid duration.");
+    return;
+  }
+
+  const data = getAssignmentData();
+  const now = new Date().toISOString();
+  data.lessons.push({
+    id: createId("lesson"),
+    date,
+    title,
+    student,
+    startTime,
+    durationHours,
+    notes,
+    teacher: currentUser.username,
+    createdAt: now,
+    updatedAt: now
+  });
+  saveAssignmentData(data);
+  renderCalendarView(date, "Class time saved.");
+}
+
+function deleteAssignment(assignmentId) {
+  if (currentUser.role !== "teacher") return;
+  if (!window.confirm("Delete this resource and its submission records?")) return;
+
+  const data = getAssignmentData();
+  const assignment = data.assignments.find((item) => item.id === assignmentId);
+  if (!assignment) return;
+
+  data.assignments = data.assignments.filter((item) => item.id !== assignmentId);
+  data.submissions = data.submissions.filter((item) => item.assignmentId !== assignmentId);
+  data.reviews = data.reviews.filter((item) => item.assignmentId !== assignmentId);
+  saveAssignmentData(data);
+  renderCalendarView(assignment.date, "Resource deleted.");
+}
+
+function deleteLesson(lessonId) {
+  if (currentUser.role !== "teacher") return;
+  if (!window.confirm("Delete this class time record?")) return;
+
+  const data = getAssignmentData();
+  const lesson = data.lessons.find((item) => item.id === lessonId);
+  if (!lesson) return;
+
+  data.lessons = data.lessons.filter((item) => item.id !== lessonId);
+  saveAssignmentData(data);
+  renderCalendarView(lesson.date, "Class time deleted.");
+}
+
+async function storeFiles(files, context) {
+  const records = [];
+
+  for (const file of files) {
+    const record = {
+      id: createId("file"),
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      size: file.size,
+      uploadedBy: context.owner,
+      uploadedAt: new Date().toISOString(),
+      kind: context.kind,
+      assignmentId: context.assignmentId,
+      blob: file
+    };
+    await putFileRecord(record);
+    records.push({
+      id: record.id,
+      name: record.name,
+      type: record.type,
+      size: record.size,
+      uploadedBy: record.uploadedBy,
+      uploadedAt: record.uploadedAt,
+      kind: record.kind
+    });
+  }
+
+  return records;
+}
+
+function openFileDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FILE_DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(FILE_STORE_NAME)) {
+        db.createObjectStore(FILE_STORE_NAME, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function putFileRecord(record) {
+  const db = await openFileDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(FILE_STORE_NAME, "readwrite");
+    transaction.objectStore(FILE_STORE_NAME).put(record);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+async function getFileRecord(fileId) {
+  const db = await openFileDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(FILE_STORE_NAME, "readonly");
+    const request = transaction.objectStore(FILE_STORE_NAME).get(fileId);
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result);
+    };
+    request.onerror = () => {
+      db.close();
+      reject(request.error);
+    };
+  });
+}
+
+async function downloadStoredFile(fileId) {
+  try {
+    const record = await getFileRecord(fileId);
+    if (!record) {
+      window.alert("File not found in this browser.");
+      return;
+    }
+    const url = URL.createObjectURL(record.blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = record.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    window.alert(`Could not open file: ${error.message}`);
+  }
+}
+
+function teacherCoursewareList(data) {
+  const files = data.assignments
+    .filter((assignment) => assignment.teacher === currentUser.username)
+    .flatMap((assignment) => (assignment.files || []).map((file) => ({
+      ...file,
+      title: assignment.title,
+      date: assignment.date,
+      resourceType: assignment.type
+    })))
+    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+
+  if (!files.length) return `<div class="empty">No uploaded resources yet.</div>`;
+
+  return `
+    <div class="file-list">
+      ${files.map((file) => `
+        <div class="file-row">
+          <div>
+            <strong>${escapeHtml(file.name)}</strong>
+            <span>${file.resourceType === "note" ? "Notes" : "Homework"} · ${escapeHtml(file.title)} · ${formatDateForDisplay(file.date)} · ${formatFileSize(file.size)}</span>
+          </div>
+          <button class="ghost-button" type="button" data-action="download-file" data-file-id="${file.id}">Download</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderFileList(files = []) {
+  if (!files.length) return `<div class="file-list empty">No files attached.</div>`;
+
+  return `
+    <div class="file-list">
+      ${files.map((file) => `
+        <div class="file-row">
+          <div>
+            <strong>${escapeHtml(file.name)}</strong>
+            <span>${formatFileSize(file.size)} · ${escapeHtml(file.type || "file")}</span>
+          </div>
+          <button class="ghost-button" type="button" data-action="download-file" data-file-id="${file.id}">Download</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function calendarCells(monthDate, data) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+
+  for (let index = 0; index < startOffset; index += 1) {
+    cells.push(`<span class="calendar-cell calendar-empty"></span>`);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = toDateKey(new Date(year, month, day));
+    const assignments = data.assignments.filter((assignment) => assignment.date === dateKey);
+    const notes = assignments.filter((assignment) => assignment.type === "note");
+    const homework = assignments.filter((assignment) => assignment.type === "homework");
+    const lessons = getLessonsForDate(data, dateKey, currentUser.username, currentUser.role === "teacher");
+    const submissions = data.submissions.filter((submission) => {
+      const assignment = data.assignments.find((item) => item.id === submission.assignmentId);
+      return assignment?.date === dateKey;
+    });
+    const selected = selectedCalendarDate === dateKey ? "selected" : "";
+    const today = todayKey() === dateKey ? "today" : "";
+    const noteBadge = notes.length ? `<span class="calendar-tag note-tag">${notes.length}N</span>` : "";
+    const homeworkBadge = homework.length ? `<span class="calendar-tag homework-tag">${homework.length}H</span>` : "";
+    const lessonBadge = lessons.length ? `<span class="calendar-tag lesson-tag">${lessons.length}L</span>` : "";
+
+    cells.push(`
+      <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}">
+        <strong>${day}</strong>
+        <span class="calendar-badges">${noteBadge}${homeworkBadge}${lessonBadge}</span>
+        ${submissions.length ? `<small>${submissions.length} submitted</small>` : ""}
+      </button>
+    `);
+  }
+
+  return cells;
+}
+
+function getStudentSubmission(data, assignmentId, student) {
+  return data.submissions.find((item) => item.assignmentId === assignmentId && item.student === student);
+}
+
+function getStudentReview(data, assignmentId, student) {
+  return data.reviews.find((item) => item.assignmentId === assignmentId && item.student === student);
+}
+
+function getLessonsForDate(data, dateKey, username, isTeacher = false) {
+  return data.lessons
+    .filter((lesson) => lesson.date === dateKey && (isTeacher || lesson.student === "all" || lesson.student === username))
+    .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+}
+
+function statusClass(status) {
+  return `status-${status.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
+function calendarMessageClass(message) {
+  return /uploaded|submitted|saved|deleted/i.test(message) ? "ok" : "";
+}
+
+function calendarWeekdays() {
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateKey) {
+  const [year, month, day] = String(dateKey).split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function monthTitle(date) {
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function formatDateForDisplay(dateKey) {
+  return parseDateKey(dateKey).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function formatClockTime(value) {
+  if (!value) return "Time not set";
+  const match = String(value).match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return value;
+  return new Date(2000, 0, 1, Number(match[1]), Number(match[2])).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatLessonHours(hours) {
+  const rounded = Math.round((Number(hours) || 0) * 100) / 100;
+  return `${rounded.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${rounded === 1 ? "hr" : "hrs"}`;
+}
+
+function formatFileSize(size) {
+  if (!Number.isFinite(size)) return "Unknown size";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  return `${(size / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
 function renderCharts(progress) {
@@ -960,15 +1978,119 @@ function recordDailyCompletion(progress, date, score, total) {
   }
 }
 
-function getProgress() {
-  const fallback = {
+function login(form) {
+  const username = form.username.value.trim();
+  const password = form.password.value;
+  const user = getUsers().find((item) => item.username === username);
+
+  if (!user || user.password !== password) {
+    renderAuth("Username or password is incorrect.");
+    return;
+  }
+
+  currentUser = { username: user.username, role: user.role };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+  updateAuthButtons();
+  renderHome();
+}
+
+function register(form) {
+  const username = form.username.value.trim();
+  const password = form.password.value;
+
+  if (username.length < 2 || password.length < 4) {
+    renderAuth("Use at least 2 characters for username and 4 for password.");
+    return;
+  }
+
+  if (username === TEACHER_USERNAME) {
+    renderAuth(`${TEACHER_USERNAME} is reserved for the teacher account.`);
+    return;
+  }
+
+  const users = getUsers();
+  if (users.some((user) => user.username.toLowerCase() === username.toLowerCase())) {
+    renderAuth("That username already exists.");
+    return;
+  }
+
+  users.push({
+    username,
+    password,
+    role: "student",
+    createdAt: new Date().toISOString()
+  });
+  saveUsers(users);
+
+  currentUser = { username, role: "student" };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+  updateAuthButtons();
+  saveProgress(getProgress(username), username);
+  renderHome();
+}
+
+function seedTeacherAccount() {
+  const users = getUsers(false);
+  const teacher = users.find((user) => user.username === TEACHER_USERNAME);
+
+  if (!teacher) {
+    users.push({
+      username: TEACHER_USERNAME,
+      password: TEACHER_PASSWORD,
+      role: "teacher",
+      createdAt: new Date().toISOString()
+    });
+  } else {
+    teacher.password = TEACHER_PASSWORD;
+    teacher.role = "teacher";
+  }
+
+  saveUsers(users);
+}
+
+function getUsers(seed = true) {
+  const users = safeJson(localStorage.getItem(USERS_KEY), []);
+  if (seed && !users.some((user) => user.username === TEACHER_USERNAME)) {
+    users.push({
+      username: TEACHER_USERNAME,
+      password: TEACHER_PASSWORD,
+      role: "teacher",
+      createdAt: new Date().toISOString()
+    });
+    saveUsers(users);
+  }
+  return users;
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function getCurrentUser() {
+  const saved = safeJson(localStorage.getItem(SESSION_KEY), null);
+  if (!saved) return null;
+
+  const user = getUsers().find((item) => item.username === saved.username);
+  if (!user) return null;
+  return { username: user.username, role: user.role };
+}
+
+function updateAuthButtons() {
+  if (logoutButton) logoutButton.classList.toggle("hidden", !currentUser);
+}
+
+function emptyProgress() {
+  return {
     attempts: [],
     sessions: [],
     mistakes: {},
     daily: { streak: 0, lastCompletedDate: "", completions: {} },
     speed: { bestScore: 0, bestAccuracy: 0, bestAverageSeconds: 0, runs: [] }
   };
-  const saved = safeJson(localStorage.getItem(STORAGE_KEY), fallback);
+}
+
+function normalizeProgress(saved = {}) {
+  const fallback = emptyProgress();
   return {
     ...fallback,
     ...saved,
@@ -980,13 +2102,30 @@ function getProgress() {
   };
 }
 
-function saveProgress(progress) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+function getProgress(username = currentUser?.username || "Guest") {
+  const allProgress = safeJson(localStorage.getItem(PROGRESS_BY_USER_KEY), {});
+  const legacy = safeJson(localStorage.getItem(LEGACY_PROGRESS_KEY), null);
+
+  if (!allProgress[username] && legacy && username !== TEACHER_USERNAME) {
+    allProgress[username] = normalizeProgress(legacy);
+    localStorage.setItem(PROGRESS_BY_USER_KEY, JSON.stringify(allProgress));
+    localStorage.removeItem(LEGACY_PROGRESS_KEY);
+  }
+
+  return normalizeProgress(allProgress[username]);
+}
+
+function saveProgress(progress, username = currentUser?.username || "Guest") {
+  const allProgress = safeJson(localStorage.getItem(PROGRESS_BY_USER_KEY), {});
+  allProgress[username] = normalizeProgress(progress);
+  localStorage.setItem(PROGRESS_BY_USER_KEY, JSON.stringify(allProgress));
 }
 
 function clearProgress() {
   if (!window.confirm("Clear all locally saved progress?")) return;
-  localStorage.removeItem(STORAGE_KEY);
+  const allProgress = safeJson(localStorage.getItem(PROGRESS_BY_USER_KEY), {});
+  delete allProgress[currentUser.username];
+  localStorage.setItem(PROGRESS_BY_USER_KEY, JSON.stringify(allProgress));
   renderProgressDashboard();
 }
 
@@ -1007,6 +2146,44 @@ function getOverallStats(progress = getProgress()) {
   const weakest = [...categoryBreakdown].sort((a, b) => a.accuracy - b.accuracy)[0]?.title || "";
 
   return { completed, correct, accuracy, averageTime, strongest, weakest };
+}
+
+function uniqueAnsweredCount(progress) {
+  return new Set(progress.attempts.map((attempt) => attempt.questionId)).size;
+}
+
+function exportTeacherReport() {
+  if (currentUser.role !== "teacher") {
+    showToast("Only the teacher account can export reports.");
+    return;
+  }
+
+  const students = getUsers().filter((user) => user.role !== "teacher");
+  const lines = [
+    ["Student", "Answers", "Accuracy", "Daily Streak", "Weakest Category"].join(",")
+  ];
+
+  students.forEach((student) => {
+    const progress = getProgress(student.username);
+    const stats = getOverallStats(progress);
+    lines.push([
+      student.username,
+      stats.completed,
+      `${stats.accuracy}%`,
+      progress.daily.streak,
+      stats.weakest || "No data"
+    ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","));
+  });
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `number-sense-report-${todayKey()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function categoryCompletion(categoryId, progress) {
@@ -1057,7 +2234,21 @@ function mockTeacherRows(progress, stats) {
 }
 
 function dailyQuestions(dateKey) {
-  return seededShuffle([...DATA.questions], hashString(dateKey)).slice(0, DAILY_COUNT);
+  const seed = hashString(dateKey);
+  const daily = [];
+
+  DATA.categories.forEach((category, index) => {
+    const pool = getQuestionsByCategory(category.id);
+    daily.push(pool[(seed + index * 7) % pool.length]);
+  });
+
+  const extraCategories = seededShuffle([...DATA.categories], seed + 17).slice(0, DAILY_COUNT - daily.length);
+  extraCategories.forEach((category, index) => {
+    const pool = getQuestionsByCategory(category.id).filter((question) => !daily.some((item) => item.id === question.id));
+    daily.push(pool[(seed + index * 11) % pool.length]);
+  });
+
+  return seededShuffle(daily, seed + 31).slice(0, DAILY_COUNT);
 }
 
 function getQuestionsByCategory(categoryId) {

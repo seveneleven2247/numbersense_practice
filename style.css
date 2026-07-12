@@ -623,6 +623,313 @@ html.dark .badge-card {
   gap: 16px;
 }
 
+.hidden {
+  display: none !important;
+}
+
+.auth-card {
+  align-self: center;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.tab-button {
+  flex: 1;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.tab-button.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+}
+
+.muted-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.calendar-layout,
+.date-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.calendar-panel,
+.date-panel {
+  padding: 20px;
+}
+
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.calendar-toolbar h2 {
+  margin: 0;
+  text-align: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekday {
+  padding: 6px 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.calendar-cell {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 90px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition: transform var(--ease), border-color var(--ease), box-shadow var(--ease);
+}
+
+.calendar-cell:not(.calendar-empty):hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.45);
+}
+
+.calendar-cell span,
+.calendar-cell small {
+  min-height: 14px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.calendar-cell.today {
+  background: var(--accent-soft);
+}
+
+.calendar-cell.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.calendar-empty {
+  pointer-events: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.calendar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.calendar-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.note-tag {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.homework-tag,
+.status-submitted,
+.status-reviewed,
+.status-complete {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.lesson-tag,
+.lesson-pill,
+.status-late,
+.status-needs-revision {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.status-missing,
+.status-not-submitted {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.compact-head {
+  margin-bottom: 0;
+}
+
+.resource-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.teacher-action-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.resource-section,
+.assignment-card,
+.submission-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface);
+}
+
+.resource-section {
+  background: var(--surface-strong);
+}
+
+.resource-section h3,
+.resource-strip h3,
+.submission-list h4,
+.assignment-head h3 {
+  margin: 0;
+}
+
+.resource-strip,
+.assignment-stack,
+.submission-list,
+.file-list,
+.student-list {
+  display: grid;
+  gap: 12px;
+}
+
+.student-category {
+  margin-top: 4px;
+}
+
+.assignment-head,
+.submission-head,
+.file-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assignment-head > div,
+.submission-head > div,
+.file-row > div {
+  min-width: 0;
+}
+
+.assignment-head p,
+.submission-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.file-row {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: var(--surface-strong);
+}
+
+.file-row strong {
+  overflow-wrap: anywhere;
+}
+
+.file-row span,
+.submission-head span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.lesson-card {
+  border-color: rgba(245, 158, 11, 0.34);
+}
+
+.lesson-meta,
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lesson-meta span {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.lesson-meta strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.student-row {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.student-row.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+.student-row strong,
+.student-row span {
+  display: block;
+}
+
+.student-row span {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -740,7 +1047,9 @@ th {
   }
 
   .hero-panel,
-  .teacher-grid {
+  .teacher-grid,
+  .resource-columns,
+  .teacher-action-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -765,8 +1074,24 @@ th {
   .module-grid,
   .chart-grid,
   .badge-grid,
-  .generator-mock {
+  .generator-mock,
+  .form-row,
+  .lesson-meta {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-grid {
+    gap: 5px;
+  }
+
+  .calendar-cell {
+    min-height: 68px;
+    padding: 7px;
+  }
+
+  .calendar-cell span,
+  .calendar-cell small {
+    font-size: 0.66rem;
   }
 
   .module-card {
@@ -785,5 +1110,12 @@ th {
 
   .question-text {
     font-size: 1.45rem;
+  }
+
+  .assignment-head,
+  .submission-head,
+  .file-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

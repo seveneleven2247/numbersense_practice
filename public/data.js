@@ -29,7 +29,7 @@ const academyModules = [
   { id: "ai-generator", title: "AI Question Generator", type: "ai", accent: "AI", description: "Placeholder UI for future personalized questions." },
   { id: "progress", title: "Progress Dashboard", type: "progress", accent: "P", description: "View accuracy, history, and category trends." },
   { id: "achievements", title: "Achievements", type: "achievements", accent: "A", description: "Unlock badges for consistency and mastery." },
-  { id: "teacher", title: "Teacher Dashboard", type: "teacher", accent: "T", description: "Mock class overview with export report UI." }
+  { id: "teacher", title: "Teacher Dashboard", type: "teacher", accent: "T", description: "Teacher-only student progress, homework review, and report export." }
 ];
 
 const questionBank = [
