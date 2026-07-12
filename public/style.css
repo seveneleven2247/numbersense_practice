@@ -592,9 +592,9 @@ html.dark .status-needs-revision {
 
 .calendar-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns: 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .calendar-panel,
@@ -641,8 +641,8 @@ html.dark .status-needs-revision {
   display: grid;
   align-content: start;
   gap: 6px;
-  min-height: 74px;
-  padding: 9px;
+  min-height: 92px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -968,7 +968,6 @@ th {
 @media (max-width: 940px) {
   .hero,
   .teacher-grid,
-  .calendar-layout,
   .resource-columns {
     grid-template-columns: 1fr;
   }
