@@ -1,9 +1,9 @@
-import { copyFile, mkdir, rm } from "node:fs/promises";
+import { copyFile, cp, mkdir, rm } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const dist = new URL("../dist/", import.meta.url);
 const publicDir = new URL("../public/", import.meta.url);
-const appFiles = ["index.html", "style.css", "script.js"];
+const appFiles = ["index.html", "style.css", "data.js", "script.js"];
 const cloudflareFiles = ["_headers"];
 
 for (const outputDir of [dist, publicDir]) {
@@ -17,6 +17,11 @@ for (const outputDir of [dist, publicDir]) {
   for (const file of cloudflareFiles) {
     await copyFile(new URL(`cloudflare/${file}`, root), new URL(file, outputDir));
   }
+
+  await cp(new URL("assets/", root), new URL("assets/", outputDir), {
+    recursive: true,
+    force: true
+  });
 }
 
 console.log("Cloudflare assets written to dist/ and public/");

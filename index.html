@@ -3,17 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Number Sense Practice</title>
+    <meta name="description" content="Number Sense Academy is an interactive practice, game, and progress tracking website for Grades 6-9 students.">
+    <title>Number Sense Academy</title>
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <button class="brand-button" type="button" data-action="home" aria-label="Go home">
-          <span class="brand-mark">NS</span>
+          <span class="brand-mark">NA</span>
           <span>
-            <strong>Number Sense Practice</strong>
-            <small>Middle school practice</small>
+            <strong>Number Sense Academy</strong>
+            <small>Grades 6-9 practice lab</small>
           </span>
         </button>
 
@@ -21,15 +22,14 @@
           <button class="ghost-button" type="button" data-action="toggle-theme" aria-label="Toggle dark mode">
             <span data-theme-label>Dark</span>
           </button>
-          <button class="ghost-button hidden" type="button" data-action="logout" data-auth-only>
-            Log out
-          </button>
         </div>
       </header>
 
       <main id="app" class="app-main"></main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="data.js"></script>
     <script src="script.js"></script>
   </body>
 </html>
