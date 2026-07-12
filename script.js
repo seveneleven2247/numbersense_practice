@@ -572,6 +572,10 @@ function handleGlobalClick(event) {
     deleteAssignment(actionTarget.dataset.assignmentId);
   }
 
+  if (action === "delete-lesson") {
+    deleteLesson(actionTarget.dataset.lessonId);
+  }
+
   if (action === "start-category") {
     startCategory(actionTarget.dataset.categoryId);
   }
@@ -615,6 +619,10 @@ function handleSubmit(event) {
 
   if (form.dataset.form === "assignment") {
     saveAssignment(form);
+  }
+
+  if (form.dataset.form === "lesson") {
+    saveLesson(form);
   }
 
   if (form.dataset.form === "submission") {
@@ -947,6 +955,10 @@ function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
   const selectedNotes = selectedDateResources.filter((assignment) => getResourceType(assignment) === "note");
   const selectedHomework = selectedDateResources.filter((assignment) => getResourceType(assignment) === "homework");
   const isTeacher = currentUser.role === "teacher";
+  const selectedLessons = getLessonsForDate(assignmentData, selectedCalendarDate, currentUser.username, isTeacher);
+  const lessonSummary = selectedLessons.length
+    ? ` · ${selectedLessons.length} class time record${selectedLessons.length === 1 ? "" : "s"} (${formatLessonHours(totalLessonHours(selectedLessons))})`
+    : "";
 
   app.innerHTML = `
     <section>
@@ -978,23 +990,24 @@ function renderCalendarView(dateKey = selectedCalendarDate, message = "") {
           <div class="section-head compact-head">
             <div>
               <h2>${formatDateForDisplay(selectedCalendarDate)}</h2>
-              <p>${selectedNotes.length} note${selectedNotes.length === 1 ? "" : "s"} · ${selectedHomework.length} homework item${selectedHomework.length === 1 ? "" : "s"}</p>
+              <p>${selectedNotes.length} note${selectedNotes.length === 1 ? "" : "s"} · ${selectedHomework.length} homework item${selectedHomework.length === 1 ? "" : "s"}${lessonSummary}</p>
             </div>
           </div>
           ${message ? `<div class="message ${calendarMessageClass(message)}">${escapeHtml(message)}</div>` : ""}
-          ${isTeacher ? teacherCalendarTools(selectedDateResources, assignmentData) : studentCalendarTools(selectedDateResources, assignmentData)}
+          ${isTeacher ? teacherCalendarTools(selectedDateResources, selectedLessons, assignmentData) : studentCalendarTools(selectedDateResources, selectedLessons, assignmentData)}
         </section>
       </div>
     </section>
   `;
 }
 
-function teacherCalendarTools(resourcesForDate, assignmentData) {
+function teacherCalendarTools(resourcesForDate, lessonsForDate, assignmentData) {
   const notes = resourcesForDate.filter((assignment) => getResourceType(assignment) === "note");
   const homework = resourcesForDate.filter((assignment) => getResourceType(assignment) === "homework");
+  const students = getUsers().filter((user) => user.role !== "teacher");
 
   return `
-    <div class="resource-columns">
+    <div class="resource-columns teacher-action-grid">
       <section class="resource-section">
         <h3>Upload Notes</h3>
         ${resourceUploadForm("note")}
@@ -1002,6 +1015,10 @@ function teacherCalendarTools(resourcesForDate, assignmentData) {
       <section class="resource-section">
         <h3>Upload Homework</h3>
         ${resourceUploadForm("homework")}
+      </section>
+      <section class="resource-section">
+        <h3>Add Class Time</h3>
+        ${lessonRecordForm(students)}
       </section>
     </div>
 
@@ -1019,6 +1036,13 @@ function teacherCalendarTools(resourcesForDate, assignmentData) {
         </div>
       </section>
     </div>
+
+    <section class="resource-strip">
+      <h3>Class Time for This Date</h3>
+      <div class="assignment-stack">
+        ${lessonsForDate.length ? lessonsForDate.map((lesson) => teacherLessonCard(lesson)).join("") : `<div class="empty">No class time recorded for this date.</div>`}
+      </div>
+    </section>
 
     <section class="resource-strip">
       <h3>My Uploaded Resources</h3>
@@ -1055,7 +1079,48 @@ function resourceUploadForm(kind) {
   `;
 }
 
-function studentCalendarTools(resourcesForDate, assignmentData) {
+function lessonRecordForm(students) {
+  return `
+    <form class="form lesson-form" data-form="lesson">
+      <input type="hidden" name="lessonDate" value="${selectedCalendarDate}">
+      <div class="field">
+        <label>Class topic</label>
+        <input name="lessonTitle" placeholder="Example: Linear equations lesson" required>
+      </div>
+      <div class="field">
+        <label>Visible to</label>
+        <select name="lessonStudent">
+          ${lessonVisibilityOptions(students)}
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>Start time</label>
+          <input name="lessonStart" type="time" required>
+        </div>
+        <div class="field">
+          <label>Duration (hours)</label>
+          <input name="lessonDuration" type="number" min="0.25" step="0.25" value="1" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Teacher note</label>
+        <textarea name="lessonNotes" placeholder="Optional: focus, homework reminder, or next-step note."></textarea>
+      </div>
+      <button class="primary-button" type="submit">Save Class Time</button>
+    </form>
+  `;
+}
+
+function lessonVisibilityOptions(students) {
+  const studentOptions = students
+    .map((student) => `<option value="${escapeHtml(student.username)}">${escapeHtml(student.username)}</option>`)
+    .join("");
+
+  return `<option value="all">All students</option>${studentOptions}`;
+}
+
+function studentCalendarTools(resourcesForDate, lessonsForDate, assignmentData) {
   const notes = resourcesForDate.filter((assignment) => getResourceType(assignment) === "note");
   const homework = resourcesForDate.filter((assignment) => getResourceType(assignment) === "homework");
 
@@ -1068,6 +1133,11 @@ function studentCalendarTools(resourcesForDate, assignmentData) {
     <section class="resource-strip student-category">
       <h3>Download Homework</h3>
       ${homework.length ? homework.map((assignment) => studentHomeworkDownloadCard(assignment)).join("") : `<div class="empty">No homework files for this date.</div>`}
+    </section>
+
+    <section class="resource-strip student-category">
+      <h3>Class Time</h3>
+      ${lessonsForDate.length ? lessonsForDate.map((lesson) => studentLessonCard(lesson)).join("") : `<div class="empty">No class time recorded for this date.</div>`}
     </section>
 
     <section class="resource-strip student-category">
@@ -1111,6 +1181,22 @@ function teacherHomeworkCard(assignment, assignmentData) {
         <h4>Student Review</h4>
         ${students.length ? students.map((student) => teacherStudentReviewCard(assignment, student.username, assignmentData)).join("") : `<div class="empty">No student accounts yet.</div>`}
       </div>
+    </article>
+  `;
+}
+
+function teacherLessonCard(lesson) {
+  return `
+    <article class="assignment-card lesson-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill lesson-pill">Class Time</span>
+          <h3>${escapeHtml(lesson.title)}</h3>
+          ${lesson.notes ? `<p>${escapeHtml(lesson.notes)}</p>` : ""}
+        </div>
+        <button class="danger-button" type="button" data-action="delete-lesson" data-lesson-id="${lesson.id}">Delete</button>
+      </div>
+      ${lessonMeta(lesson, true)}
     </article>
   `;
 }
@@ -1191,6 +1277,21 @@ function studentHomeworkDownloadCard(assignment) {
   `;
 }
 
+function studentLessonCard(lesson) {
+  return `
+    <article class="assignment-card lesson-card">
+      <div class="assignment-head">
+        <div>
+          <span class="pill lesson-pill">Class Time</span>
+          <h3>${escapeHtml(lesson.title)}</h3>
+          ${lesson.notes ? `<p>${escapeHtml(lesson.notes)}</p>` : ""}
+        </div>
+      </div>
+      ${lessonMeta(lesson, false)}
+    </article>
+  `;
+}
+
 function studentAssignmentCard(assignment, assignmentData) {
   const submission = getStudentSubmission(assignmentData, assignment.id, currentUser.username);
   const review = getStudentReview(assignmentData, assignment.id, currentUser.username);
@@ -1246,6 +1347,63 @@ function studentPrivateReview(review) {
       ${escapeHtml(review.comment)}
     </div>
   `;
+}
+
+function lessonMeta(lesson, showStudent) {
+  const visibility = showStudent
+    ? `<span><strong>Visible to</strong>${escapeHtml(lessonStudentLabel(lesson))}</span>`
+    : "";
+
+  return `
+    <div class="lesson-meta">
+      <span><strong>Date</strong>${formatDateForDisplay(lesson.date)}</span>
+      <span><strong>Start</strong>${escapeHtml(formatClockTime(lesson.startTime))}</span>
+      <span><strong>Duration</strong>${formatLessonHours(Number(lesson.durationHours) || 0)}</span>
+      ${visibility}
+    </div>
+  `;
+}
+
+function getLessonsForDate(assignmentData, dateKey, username, isTeacher = false) {
+  return (assignmentData.lessons || [])
+    .filter((lesson) => (
+      lesson.date === dateKey
+      && (isTeacher || lessonIsVisibleToStudent(lesson, username))
+    ))
+    .sort((a, b) => {
+      const timeOrder = (a.startTime || "").localeCompare(b.startTime || "");
+      return timeOrder || (a.createdAt || "").localeCompare(b.createdAt || "");
+    });
+}
+
+function lessonIsVisibleToStudent(lesson, username) {
+  return !lesson.student || lesson.student === "all" || lesson.student === username;
+}
+
+function lessonStudentLabel(lesson) {
+  return !lesson.student || lesson.student === "all" ? "All students" : lesson.student;
+}
+
+function totalLessonHours(lessons) {
+  return lessons.reduce((sum, lesson) => sum + (Number(lesson.durationHours) || 0), 0);
+}
+
+function formatLessonHours(hours) {
+  const rounded = Math.round((Number(hours) || 0) * 100) / 100;
+  const label = rounded === 1 ? "hr" : "hrs";
+  return `${rounded.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${label}`;
+}
+
+function formatClockTime(value) {
+  if (!value) return "Time not set";
+  const match = String(value).match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return value;
+
+  const date = new Date(2000, 0, 1, Number(match[1]), Number(match[2]));
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function getResourceType(assignment) {
@@ -1345,6 +1503,8 @@ function calendarCells(monthDate, assignmentData) {
     const assignments = assignmentData.assignments.filter((assignment) => assignment.date === dateKey);
     const notes = assignments.filter((assignment) => getResourceType(assignment) === "note");
     const homework = assignments.filter((assignment) => getResourceType(assignment) === "homework");
+    const isTeacher = currentUser?.role === "teacher";
+    const lessons = getLessonsForDate(assignmentData, dateKey, currentUser?.username, isTeacher);
     const submissions = assignmentData.submissions.filter((submission) => {
       const assignment = assignmentData.assignments.find((item) => item.id === submission.assignmentId);
       return assignment?.date === dateKey && getResourceType(assignment) === "homework";
@@ -1354,12 +1514,13 @@ function calendarCells(monthDate, assignmentData) {
 
     const noteBadge = notes.length ? `<span class="calendar-tag note-tag">${notes.length}N</span>` : "";
     const homeworkBadge = homework.length ? `<span class="calendar-tag homework-tag">${homework.length}H</span>` : "";
+    const lessonBadge = lessons.length ? `<span class="calendar-tag lesson-tag">${lessons.length}L</span>` : "";
     const submissionBadge = submissions.length ? `<small>${submissions.length} submitted</small>` : "";
 
     cells.push(`
-      <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}" aria-label="${dateKey}: ${notes.length} notes, ${homework.length} homework, ${submissions.length} submissions">
+      <button class="calendar-cell ${selected} ${today}" type="button" data-action="select-date" data-date="${dateKey}" aria-label="${dateKey}: ${notes.length} notes, ${homework.length} homework, ${lessons.length} class time records, ${submissions.length} submissions">
         <strong>${day}</strong>
-        <span class="calendar-badges">${noteBadge}${homeworkBadge}</span>
+        <span class="calendar-badges">${noteBadge}${homeworkBadge}${lessonBadge}</span>
         ${submissionBadge}
       </button>
     `);
@@ -1565,12 +1726,13 @@ function savePracticeData(data) {
 
 function getAssignmentData() {
   const data = safeJson(localStorage.getItem(ASSIGNMENTS_KEY), null);
-  if (!data) return { assignments: [], submissions: [], reviews: [] };
+  if (!data) return { assignments: [], submissions: [], reviews: [], lessons: [] };
 
   return {
     assignments: Array.isArray(data.assignments) ? data.assignments : [],
     submissions: Array.isArray(data.submissions) ? data.submissions : [],
-    reviews: Array.isArray(data.reviews) ? data.reviews : []
+    reviews: Array.isArray(data.reviews) ? data.reviews : [],
+    lessons: Array.isArray(data.lessons) ? data.lessons : []
   };
 }
 
@@ -1578,7 +1740,8 @@ function saveAssignmentData(data) {
   localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify({
     assignments: data.assignments || [],
     submissions: data.submissions || [],
-    reviews: data.reviews || []
+    reviews: data.reviews || [],
+    lessons: data.lessons || []
   }));
 }
 
@@ -1625,6 +1788,44 @@ async function saveAssignment(form) {
   } catch (error) {
     renderCalendarView(date, `Upload failed: ${error.message}`);
   }
+}
+
+function saveLesson(form) {
+  if (currentUser.role !== "teacher") return;
+
+  const date = form.elements.lessonDate.value;
+  const title = form.elements.lessonTitle.value.trim();
+  const student = form.elements.lessonStudent.value || "all";
+  const startTime = form.elements.lessonStart.value;
+  const durationHours = Number(form.elements.lessonDuration.value);
+  const notes = form.elements.lessonNotes.value.trim();
+
+  if (!date || !title || !startTime || !Number.isFinite(durationHours) || durationHours <= 0) {
+    renderCalendarView(date || selectedCalendarDate, "Please add a class topic, start time, and valid duration.");
+    return;
+  }
+
+  const data = getAssignmentData();
+  const now = new Date().toISOString();
+
+  data.lessons = data.lessons || [];
+  data.lessons.push({
+    id: createId("lesson"),
+    date,
+    title,
+    student,
+    startTime,
+    durationHours,
+    notes,
+    teacher: currentUser.username,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  saveAssignmentData(data);
+  selectedCalendarDate = date;
+  calendarMonth = parseDateKey(date);
+  renderCalendarView(date, "Class time saved.");
 }
 
 async function saveSubmission(form) {
@@ -1741,6 +1942,19 @@ function deleteAssignment(assignmentId) {
   data.reviews = (data.reviews || []).filter((item) => item.assignmentId !== assignmentId);
   saveAssignmentData(data);
   renderCalendarView(assignment.date, `${labelForResourceType(getResourceType(assignment))} deleted.`);
+}
+
+function deleteLesson(lessonId) {
+  if (currentUser.role !== "teacher") return;
+  if (!window.confirm("Delete this class time record?")) return;
+
+  const data = getAssignmentData();
+  const lesson = (data.lessons || []).find((item) => item.id === lessonId);
+  if (!lesson) return;
+
+  data.lessons = (data.lessons || []).filter((item) => item.id !== lessonId);
+  saveAssignmentData(data);
+  renderCalendarView(lesson.date, "Class time deleted.");
 }
 
 async function storeFiles(files, context) {
