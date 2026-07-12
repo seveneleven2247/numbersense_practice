@@ -364,7 +364,8 @@ html.dark .score-card {
 }
 
 .section-head h1,
-.section-head h2 {
+.section-head h2,
+.section-head h3 {
   margin: 0;
 }
 
@@ -599,6 +600,28 @@ html.dark .lesson-pill {
   display: grid;
   grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.15fr);
   gap: 16px;
+}
+
+.teacher-overview {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compact-stats {
+  margin: 16px 0;
+}
+
+.compact-stats .stat strong {
+  font-size: 1.05rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .calendar-layout {
@@ -950,6 +973,61 @@ html.dark .lesson-tag {
   color: var(--muted);
 }
 
+.answer-audit {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.answer-audit .section-head {
+  margin-bottom: 0;
+}
+
+.answer-audit-group {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.answer-audit-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  color: var(--text);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.answer-audit-group summary span:last-child {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.answer-audit-group[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.answer-audit-group .table-wrap {
+  padding: 0 12px 12px;
+}
+
+.answer-table {
+  min-width: 920px;
+}
+
+.question-cell {
+  max-width: 360px;
+  line-height: 1.35;
+}
+
+.muted-cell {
+  color: var(--muted);
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -1034,6 +1112,10 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .overview-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .lesson-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1068,7 +1150,8 @@ th {
   }
 
   .category-grid,
-  .stat-grid {
+  .stat-grid,
+  .overview-stats {
     grid-template-columns: 1fr;
   }
 
@@ -1106,7 +1189,8 @@ th {
 
   .assignment-head,
   .submission-head,
-  .file-row {
+  .file-row,
+  .answer-audit-group summary {
     align-items: stretch;
     flex-direction: column;
   }

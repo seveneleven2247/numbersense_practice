@@ -588,6 +588,10 @@ function handleGlobalClick(event) {
     showAnswer();
   }
 
+  if (action === "mark-unknown") {
+    markUnknown();
+  }
+
   if (action === "next-question") {
     nextQuestion();
   }
@@ -832,6 +836,7 @@ function renderQuestion() {
           <div class="button-row">
             <button class="primary-button" type="button" data-action="check-answer">Check Answer</button>
             <button class="secondary-button" type="button" data-action="show-answer">Show Answer</button>
+            <button class="secondary-button" type="button" data-action="mark-unknown">Mark I Don't Know</button>
             <button class="ghost-button" type="button" data-action="next-question">${practiceSession.position === 9 ? "Finish" : "Next Question"}</button>
           </div>
           <div class="feedback" id="feedback" aria-live="polite"></div>
@@ -894,10 +899,47 @@ function showAnswer() {
   const category = getCurrentCategory();
   const questionIndex = practiceSession.order[practiceSession.position];
   const question = category.questions[questionIndex];
+  const elapsed = Math.round((Date.now() - practiceSession.questionStartedAt) / 1000);
+
   practiceSession.revealed[questionIndex] = true;
+  practiceSession.answers[questionIndex] = practiceSession.answers[questionIndex] || {
+    answer: "",
+    correct: false,
+    revealed: true,
+    markedUnknown: false,
+    elapsed
+  };
+  practiceSession.answers[questionIndex].revealed = true;
+  practiceSession.answers[questionIndex].elapsed = elapsed;
+
+  saveQuestionAttempt(category.id, questionIndex, practiceSession.answers[questionIndex]);
 
   feedback.className = "feedback show";
   feedback.innerHTML = `<strong>Answer: ${formatAnswer(question.answer)}</strong>${question.explanation}`;
+}
+
+function markUnknown() {
+  if (!practiceSession) return;
+
+  const feedback = document.querySelector("#feedback");
+  const category = getCurrentCategory();
+  const questionIndex = practiceSession.order[practiceSession.position];
+  const question = category.questions[questionIndex];
+  const elapsed = Math.round((Date.now() - practiceSession.questionStartedAt) / 1000);
+
+  practiceSession.revealed[questionIndex] = true;
+  practiceSession.answers[questionIndex] = {
+    answer: "",
+    correct: false,
+    revealed: true,
+    markedUnknown: true,
+    elapsed
+  };
+
+  saveQuestionAttempt(category.id, questionIndex, practiceSession.answers[questionIndex]);
+
+  feedback.className = "feedback show incorrect";
+  feedback.innerHTML = `<strong>Marked for teacher review.</strong>Answer: ${formatAnswer(question.answer)}<br>${question.explanation}`;
 }
 
 function nextQuestion() {
@@ -1553,9 +1595,11 @@ function renderTeacherDashboard(selectedUsername = "") {
         </div>
       </div>
 
+      ${teacherPracticeOverview(users, data)}
+
       <div class="teacher-grid">
         <aside class="panel">
-          <h2>Students</h2>
+          <h2>Registered Students</h2>
           <div class="student-list">
             ${users.length ? users.map((user) => studentRow(user, selected, data)).join("") : `<div class="empty">No student accounts yet.</div>`}
           </div>
@@ -1574,8 +1618,72 @@ function studentRow(user, selected, data) {
   return `
     <button class="student-row ${selected === user.username ? "active" : ""}" type="button" data-action="view-student" data-username="${escapeHtml(user.username)}">
       <strong>${escapeHtml(user.username)}</strong>
-      <span>${stats.attempted}/80 answered, ${stats.correct} correct</span>
+      <span>${stats.attempted}/80 answered · ${stats.correct} correct · ${formatActivity(stats.lastActivity)}</span>
     </button>
+  `;
+}
+
+function teacherPracticeOverview(users, data) {
+  if (!users.length) {
+    return `<section class="panel teacher-overview"><div class="empty">No registered students yet.</div></section>`;
+  }
+
+  const rows = users.map((user) => {
+    const stats = getUserStats(user.username, data);
+    return `
+      <tr>
+        <td>${escapeHtml(user.username)}</td>
+        <td>${stats.attempted}/80</td>
+        <td>${stats.correct}</td>
+        <td>${stats.needsHelp}</td>
+        <td>${stats.progressPercent}%</td>
+        <td>${formatActivity(stats.lastActivity)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const totals = users.reduce((summary, user) => {
+    const stats = getUserStats(user.username, data);
+    summary.attempted += stats.attempted;
+    summary.correct += stats.correct;
+    summary.needsHelp += stats.needsHelp;
+    summary.progress += stats.progressPercent;
+    return summary;
+  }, { attempted: 0, correct: 0, needsHelp: 0, progress: 0 });
+
+  const averageProgress = Math.round(totals.progress / users.length);
+
+  return `
+    <section class="panel teacher-overview">
+      <div class="section-head">
+        <div>
+          <h2>All Registered Students</h2>
+          <p>Teacher-only practice progress across every registered student on this device.</p>
+        </div>
+      </div>
+      <div class="overview-stats">
+        <div class="stat"><strong>${users.length}</strong><span>Registered students</span></div>
+        <div class="stat"><strong>${totals.attempted}</strong><span>Total answers</span></div>
+        <div class="stat"><strong>${totals.correct}</strong><span>Total correct</span></div>
+        <div class="stat"><strong>${totals.needsHelp}</strong><span>Marked for help</span></div>
+        <div class="stat"><strong>${averageProgress}%</strong><span>Average progress</span></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Answered</th>
+              <th>Correct</th>
+              <th>Needs Help</th>
+              <th>Progress</th>
+              <th>Last Activity</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </section>
   `;
 }
 
@@ -1587,13 +1695,16 @@ function studentDetail(username, data) {
     const answers = categoryData.answers || {};
     const attempted = Object.keys(answers).length;
     const correct = Object.values(answers).filter((answer) => answer.correct).length;
+    const needsHelp = Object.values(answers).filter((answer) => answer.markedUnknown).length;
     const bestScore = categoryData.bestScore ?? 0;
     return `
       <tr>
         <td>${category.title}</td>
         <td>${attempted}/10</td>
         <td>${correct}</td>
+        <td>${needsHelp}</td>
         <td>${bestScore}/10</td>
+        <td>${formatActivity(categoryLastActivity(categoryData))}</td>
       </tr>
     `;
   }).join("");
@@ -1602,12 +1713,19 @@ function studentDetail(username, data) {
     <div class="section-head">
       <div>
         <h2>${escapeHtml(username)}</h2>
-        <p>${stats.attempted}/80 answered, ${stats.correct} correct</p>
+        <p>${stats.attempted}/80 answered · ${stats.correct} correct · ${stats.needsHelp} marked for help</p>
       </div>
       <button class="danger-button" type="button" data-action="clear-student" data-username="${escapeHtml(username)}">Clear Data</button>
     </div>
     <div class="progress-track">
       <div class="progress-fill" style="width: ${stats.progressPercent}%"></div>
+    </div>
+    <div class="overview-stats compact-stats">
+      <div class="stat"><strong>${stats.attempted}</strong><span>Answered</span></div>
+      <div class="stat"><strong>${stats.correct}</strong><span>Correct</span></div>
+      <div class="stat"><strong>${stats.incorrect}</strong><span>Incorrect/review</span></div>
+      <div class="stat"><strong>${stats.needsHelp}</strong><span>Needs help</span></div>
+      <div class="stat"><strong>${formatActivity(stats.lastActivity)}</strong><span>Last activity</span></div>
     </div>
     <div class="table-wrap">
       <table>
@@ -1616,13 +1734,99 @@ function studentDetail(username, data) {
             <th>Category</th>
             <th>Progress</th>
             <th>Correct</th>
+            <th>Needs Help</th>
             <th>Best</th>
+            <th>Last Activity</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
+    ${studentAnswerAudit(username, data)}
   `;
+}
+
+function studentAnswerAudit(username, data) {
+  const userData = data[username] || { categories: {} };
+
+  return `
+    <section class="answer-audit">
+      <div class="section-head">
+        <div>
+          <h3>Question-by-Question Record</h3>
+          <p>Teacher-only view of answers, status, time spent, and review markers.</p>
+        </div>
+      </div>
+      ${categories.map((category, categoryIndex) => studentCategoryAudit(category, categoryIndex, userData)).join("")}
+    </section>
+  `;
+}
+
+function studentCategoryAudit(category, categoryIndex, userData) {
+  const categoryData = userData.categories?.[category.id] || {};
+  const answers = categoryData.answers || {};
+  const attempted = Object.keys(answers).length;
+  const correct = Object.values(answers).filter((answer) => answer.correct).length;
+
+  return `
+    <details class="answer-audit-group" ${attempted || categoryIndex === 0 ? "open" : ""}>
+      <summary>
+        <span>${escapeHtml(category.title)}</span>
+        <span>${attempted}/10 answered · ${correct} correct</span>
+      </summary>
+      <div class="table-wrap">
+        <table class="answer-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Student Answer</th>
+              <th>Correct Answer</th>
+              <th>Status</th>
+              <th>Time</th>
+              <th>Saved</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${category.questions.map((question, index) => studentQuestionAuditRow(question, index, answers[index])).join("")}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  `;
+}
+
+function studentQuestionAuditRow(question, index, answer) {
+  const status = answerStatus(answer);
+  const studentAnswer = answerText(answer);
+
+  return `
+    <tr>
+      <td>${index + 1}</td>
+      <td class="question-cell">${escapeHtml(question.question)}</td>
+      <td>${studentAnswer}</td>
+      <td>${formatAnswer(question.answer)}</td>
+      <td><span class="pill status-pill ${status.className}">${status.label}</span></td>
+      <td>${answer?.elapsed ? formatDuration(answer.elapsed) : `<span class="muted-cell">-</span>`}</td>
+      <td>${answer?.savedAt ? formatActivity(answer.savedAt) : `<span class="muted-cell">Not saved</span>`}</td>
+    </tr>
+  `;
+}
+
+function answerText(answer) {
+  if (!answer) return `<span class="muted-cell">No answer</span>`;
+  if (answer.markedUnknown) return `<span class="muted-cell">Marked I don't know</span>`;
+  if (!answer.answer && answer.revealed) return `<span class="muted-cell">Answer shown</span>`;
+  if (!answer.answer) return `<span class="muted-cell">Blank</span>`;
+  return escapeHtml(answer.answer);
+}
+
+function answerStatus(answer) {
+  if (!answer) return { label: "Not tried", className: "status-not-submitted" };
+  if (answer.markedUnknown) return { label: "Needs help", className: "status-needs-revision" };
+  if (answer.correct) return { label: "Correct", className: "status-complete" };
+  if (answer.revealed) return { label: "Answer shown", className: "status-reviewed" };
+  return { label: "Incorrect", className: "status-missing" };
 }
 
 function login(form) {
@@ -2115,21 +2319,48 @@ function getUserStats(username, data = getPracticeData()) {
   let attempted = 0;
   let correct = 0;
   let completed = 0;
+  let needsHelp = 0;
+  let reviewOnly = 0;
+  let lastActivity = "";
 
   categories.forEach((category) => {
     const categoryData = userData.categories?.[category.id];
     const answers = categoryData?.answers || {};
-    attempted += Object.keys(answers).length;
-    correct += Object.values(answers).filter((answer) => answer.correct).length;
+    const answerValues = Object.values(answers);
+
+    attempted += answerValues.length;
+    correct += answerValues.filter((answer) => answer.correct).length;
+    needsHelp += answerValues.filter((answer) => answer.markedUnknown).length;
+    reviewOnly += answerValues.filter((answer) => answer.revealed && !answer.markedUnknown && !answer.correct).length;
+    lastActivity = latestIso(lastActivity, categoryLastActivity(categoryData));
     if ((categoryData?.sessions || []).length > 0) completed += 1;
   });
 
   return {
     attempted,
     correct,
+    incorrect: Math.max(0, attempted - correct),
+    needsHelp,
+    reviewOnly,
     completed,
+    lastActivity,
     progressPercent: Math.round((attempted / 80) * 100)
   };
+}
+
+function categoryLastActivity(categoryData = {}) {
+  const answerTimes = Object.values(categoryData.answers || {}).map((answer) => answer.savedAt);
+  const sessionTimes = (categoryData.sessions || []).map((session) => session.completedAt);
+  const times = [...answerTimes, ...sessionTimes, categoryData.completedAt]
+    .filter(Boolean)
+    .sort();
+  return times[times.length - 1] || "";
+}
+
+function latestIso(first, second) {
+  if (!first) return second || "";
+  if (!second) return first;
+  return first > second ? first : second;
 }
 
 function clearStudentData(username) {
@@ -2286,6 +2517,19 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function formatActivity(value) {
+  return value ? formatDateTime(value) : "No activity yet";
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(Number(seconds))) return "-";
+  const totalSeconds = Math.max(0, Math.round(Number(seconds)));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
+  if (!minutes) return `${remainder}s`;
+  return `${minutes}m ${String(remainder).padStart(2, "0")}s`;
 }
 
 function formatFileSize(size) {
