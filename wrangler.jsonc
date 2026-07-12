@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "numbersensepractice2",
+  "name": "numbersensepractice",
   "account_id": "5549f41d5fa87a72d0a1f313203437b1",
   "compatibility_date": "2026-07-11",
   "assets": {
